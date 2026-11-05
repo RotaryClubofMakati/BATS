@@ -1223,7 +1223,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     <div><label id="frDateLbl">Date *</label><input id="frDate" type="date"></div>
     <div class="full"><label>Remarks (reason for any change)</label><textarea id="frRemarks" rows="2" placeholder="e.g. requestor asked for fewer copies / extra books added"></textarea></div>
   </div>
-  <div class="actions"><button class="gray" onclick="closeM('finalReleaseModal')">Cancel</button><button class="green" id="frSave" onclick="saveFinalRelease()">Confirm Final Release</button></div>
+  <div class="actions"><button class="gray" onclick="closeM('finalReleaseModal')">Cancel</button><button type="button" id="frPrint" onclick="frPrintCopy()">🖨 Print Receiving Copy</button><button class="green" id="frSave" onclick="saveFinalRelease()">Confirm Final Release</button></div>
 </div></div>
 <script>
 (function(){
@@ -1262,13 +1262,30 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     document.getElementById('frBooks').innerHTML='';
     const items=r.items||[{bookRow:r.bookRow,bookTitle:r.bookTitle,qty:r.qty}];
     items.forEach(i=>{frOrig[String(i.bookRow)]=(frOrig[String(i.bookRow)]||0)+Number(i.qty||0)});
-    items.forEach(i=>frAddRow(i.bookRow,i.qty,i.qty));
+    const dr=(window._rcvDraft||{})[String(id)];
+    (dr?dr.items:items).forEach(i=>frAddRow(i.bookRow,i.qty,i.qty));
     document.getElementById('frDate').value=new Date().toISOString().slice(0,10);
-    document.getElementById('frRemarks').value='';
+    document.getElementById('frRemarks').value=(dr&&dr.remarks)||'';
     totals();
     document.getElementById('finalReleaseModal').classList.add('open');
   };
   window.warehouseMark=window.openWarehouseDate;
+  // Print the Receiving Copy with the actual books currently typed in (before confirming Picked Up / Delivered)
+  window.frPrintCopy=function(){
+    const rows=[...document.querySelectorAll('#frBooks tr')],items=[];
+    for(const tr of rows){
+      const row=tr.querySelector('.frBook').value,q=Number(tr.querySelector('.frQty').value||0);
+      if(!row||q<=0){alert('Select a book and an actual quantity of at least 1 for every row (or remove the row) before printing.');return}
+      const b=inventory.find(z=>String(z.row)===String(row));
+      items.push({bookTitle:b?b.title:'',subject:b?b.subject:'',grade:b?b.grade:'',qty:q});
+    }
+    if(!items.length){alert('Add at least one book to print.');return}
+    const r=bookRequests.find(x=>String(x.requestId)===frId)||{};
+    const orig=(r.items||[]).map(i=>i.bookTitle+' ×'+i.qty).join('; ');
+    const now=items.map(i=>i.bookTitle+' ×'+i.qty).join('; ');
+    printReceivingCopy(frId,{items:items,status:frStatus,date:document.getElementById('frDate').value,
+      original:orig!==now?orig:'',remarks:document.getElementById('frRemarks').value.trim()});
+  };
   window.saveFinalRelease=async function(){
     const rows=[...document.querySelectorAll('#frBooks tr')];
     if(!rows.length){alert('Keep at least one book in the release.');return}
@@ -1302,17 +1319,20 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
 (function(){
   const FINISHED=['picked up','delivered','released','completed'];
   const dateOf=r=>r.pickedUpDate||r.deliveredDate||r.releaseDate||r.updatedDate||'';
-  window.printReceivingCopy=function(id){
+  window.printReceivingCopy=function(id,ov){
+    ov=ov||{};
     const r=bookRequests.find(x=>String(x.requestId)===String(id));
     if(!r){alert('Request not found. Refresh the list.');return}
-    const items=(r.items&&r.items.length?r.items:[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}]);
+    const items=ov.items||(r.items&&r.items.length?r.items:[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}]);
     const total=items.reduce((n,i)=>n+(Number(i.qty)||0),0);
     const st=String(r.status||'').trim();
-    const how=/deliver/i.test(st)?'Delivered':/pick/i.test(st)?'Picked up':st;
+    const st2=ov.status||st;
+    const how=/deliver/i.test(st2)?'Delivered':/pick/i.test(st2)?'Picked up':(FINISHED.indexOf(st.toLowerCase())>=0?st:'For release');
     const rel=String(r.handledBy||'').replace(/\s*\(.*$/,'');
-    const dt=requestDate(dateOf(r))||'';
+    const dt=ov.date?(requestDate(ov.date)||ov.date):(FINISHED.indexOf(st.toLowerCase())>=0?(requestDate(dateOf(r))||''):'');
     const rows=items.map((i,n)=>'<tr><td class="c">'+(n+1)+'</td><td>'+esc(i.bookTitle)+'</td><td>'+esc(i.subject)+'</td><td class="c">'+esc(i.grade)+'</td><td class="c">'+esc(i.qty)+'</td></tr>').join('');
-    const orig=r.originalRequest?'<p class="note"><b>Originally requested:</b> '+esc(r.originalRequest)+(r.finalRemarks?'<br><b>Remarks:</b> '+esc(r.finalRemarks):'')+'</p>':(r.finalRemarks?'<p class="note"><b>Remarks:</b> '+esc(r.finalRemarks)+'</p>':'');
+    const origTxt=ov.original!==undefined?ov.original:r.originalRequest,remTxt=ov.remarks!==undefined?ov.remarks:r.finalRemarks;
+    const orig=origTxt?'<p class="note"><b>Originally requested:</b> '+esc(origTxt)+(remTxt?'<br><b>Remarks:</b> '+esc(remTxt):'')+'</p>':(remTxt?'<p class="note"><b>Remarks:</b> '+esc(remTxt)+'</p>':'');
     const info=(l,v)=>'<tr><td class="l">'+l+'</td><td>'+esc(v||'')+'</td></tr>';
     const css='@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0}'+
       '.hd{text-align:center;border-bottom:2px solid #173b72;padding-bottom:10px;margin-bottom:14px}.hd .org{font-size:12px;letter-spacing:1px;color:#444}.hd h1{margin:4px 0 2px;font-size:20px;color:#173b72}.hd h2{margin:0;font-size:15px}'+
@@ -1322,7 +1342,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       '.sig{display:flex;gap:18px;margin-top:34px}.sig div{flex:1;text-align:center}.sig .ln{border-top:1px solid #000;margin-top:42px;padding-top:4px;font-weight:bold}.sig small{display:block;color:#555}'+
       '.ft{margin-top:26px;font-size:11px;color:#666;text-align:center}';
     const body='<div class="hd"><div class="org">ROTARY CLUB OF MAKATI • BOOKS ACROSS THE SEAS (BATS)</div><h1>RECEIVING COPY</h1><h2>Acknowledgment of Receipt of Books</h2></div>'+
-      '<table class="info">'+info('Request No.',r.requestId)+info('Delivery Receipt No.',r.releaseId)+info('Status',how)+info('Date '+(how||'released').toLowerCase(),dt)+
+      '<table class="info">'+info('Request No.',r.requestId)+info('Delivery Receipt No.',r.releaseId)+info('Status',how)+info(how==='For release'?'Date':'Date '+how.toLowerCase(),dt)+
       info('Recipient / Requestor',r.requestor)+info('Organization / School',[r.organization,r.school].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' / '))+
       info('Address',r.address)+info('Contact / Mobile',r.mobile)+info('Purpose',r.purpose)+'</table>'+
       '<table class="books"><thead><tr><th style="width:36px">#</th><th>Book Title</th><th>Subject</th><th style="width:70px">Grade</th><th style="width:70px">Qty</th></tr></thead><tbody>'+rows+
@@ -1336,20 +1356,20 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     w.document.write('<html><head><title>Receiving Copy '+esc(r.requestId)+'</title><style>'+css+'</style></head><body>'+body+'<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>');
     w.document.close();
   };
-  const btn=id=>'<button type="button" onclick="printReceivingCopy(\''+String(id||'').replace(/['"\\]/g,'')+'\')">🖨 Receiving Copy</button>';
+  const btn=id=>'<button type="button" class="green" onclick="openReceivingCopy(\''+String(id||'').replace(/['"\\]/g,'')+'\')">🧾 Receiving</button>';
 
   // In Progress list: show the print button once Picked Up / Delivered / Released
   const prevActions=window.progressActions;
   window.progressActions=function(r){
     const a=prevActions(r);
-    return FINISHED.indexOf(String(r.status||'').trim().toLowerCase())>=0?a+btn(r.requestId):a;
+    return a+btn(r.requestId);
   };
   // Completed list: add the print button next to each request
   const prevCompleted=window.renderCompleted;
   window.renderCompleted=function(){
     prevCompleted.apply(this,arguments);
     document.querySelectorAll('#completedBody tr').forEach(tr=>{
-      if(tr.querySelector('[onclick^="printReceivingCopy"]'))return;
+      if(tr.querySelector('[onclick^="openReceivingCopy"]'))return;
       const d=tr.querySelector('[data-request-id]');if(!d)return;
       d.insertAdjacentHTML('beforebegin',btn(d.getAttribute('data-request-id')));
     });
@@ -1407,6 +1427,86 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     if(!w){alert('Please allow pop-ups for this site so the Receiving Report can open.');return}
     w.document.write('<html><head><title>Receiving Report</title><style>'+css+'</style></head><body>'+html+'<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>');
     w.document.close();
+  };
+})();
+</script>
+<!-- ===== Receiving window: warehouse enters the ACTUAL books the requestor receives, then prints the Receiving Copy ===== -->
+<div class="modal" id="receivingCopyModal"><div class="box" style="width:min(860px,100%)">
+  <h2 style="margin-top:0">Receiving – Actual Books Received</h2>
+  <div id="rcInfo" class="small"></div>
+  <div class="small" style="margin:6px 0 10px">Enter how many books the requestor will <b>actually receive</b>. Change a quantity, remove a book, or add another one, then print the Receiving Copy for signature. Printing does not change stock or status.</div>
+  <div class="table-wrap"><table><thead><tr><th>#</th><th>Book</th><th class="num">Requested</th><th class="num">Actual Qty</th><th></th></tr></thead><tbody id="rcBooks"></tbody></table></div>
+  <button type="button" class="gray" style="margin-top:8px" onclick="rcAddRow('',1)">＋ Add Another Book</button>
+  <div id="rcTotal" style="margin:10px 0;font-weight:700"></div>
+  <div id="rcWarn" style="color:#991b1b;font-weight:700;margin:6px 0"></div>
+  <div class="form">
+    <div><label>Release type</label><select id="rcType"><option value="Picked Up">Pick-up</option><option value="Delivered">Delivery</option></select></div>
+    <div><label>Date</label><input id="rcDate" type="date"></div>
+    <div class="full"><label>Remarks (reason for any change)</label><textarea id="rcRemarks" rows="2" placeholder="e.g. requestor asked for fewer copies / extra books added"></textarea></div>
+  </div>
+  <div class="small" style="margin-top:6px">When you later press <b>Picked Up</b> or <b>Delivered</b>, the Final Release window opens with these same quantities.</div>
+  <div class="actions"><button class="gray" onclick="closeM('receivingCopyModal')">Close</button><button class="green" onclick="rcPrint()">🖨 Print Receiving Copy</button></div>
+</div></div>
+<script>
+(function(){
+  const FIN=['picked up','delivered','released','completed'];
+  let rcId='',rcOrig={};
+  window._rcvDraft=window._rcvDraft||{};
+  const optHtml=sel=>'<option value="">— Select book —</option>'+inventory.slice().sort((a,b)=>String(a.title).localeCompare(String(b.title))).map(b=>'<option value="'+esc(String(b.row))+'"'+(String(b.row)===String(sel)?' selected':'')+'>'+esc(b.title)+' — '+esc(b.subject)+' / Gr. '+esc(b.grade)+' (stock '+Number(b.qty||0)+')</option>').join('');
+  const stockOf=row=>{const b=inventory.find(z=>String(z.row)===String(row));return b?Number(b.qty||0):0};
+  function totals(){
+    let t=0,warn=[];
+    document.querySelectorAll('#rcBooks tr').forEach((tr,i)=>{
+      tr.querySelector('.rcN').textContent=i+1;
+      const row=tr.querySelector('.rcBook').value,q=Number(tr.querySelector('.rcQty').value||0);t+=q;
+      const was=rcOrig[row]||0;tr.querySelector('.rcReq').textContent=row?(was?was:'new'):'—';
+      if(row&&q>stockOf(row)){const b=inventory.find(z=>String(z.row)===String(row));warn.push((b?b.title:'Book')+' (actual '+q+', stock '+stockOf(row)+')')}
+    });
+    document.getElementById('rcTotal').textContent='Total books received: '+t.toLocaleString();
+    document.getElementById('rcWarn').textContent=warn.length?'Warning – not enough stock: '+warn.join('; '):'';
+  }
+  window.rcAddRow=function(row,qty){
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td class="rcN"></td><td><select class="rcBook" style="width:100%">'+optHtml(row)+'</select></td><td class="num rcReq"></td><td class="num"><input class="rcQty" type="number" min="1" value="'+(qty||1)+'" style="width:90px"></td><td><button type="button" class="red" onclick="this.closest(\'tr\').remove();rcTotals()">Remove</button></td>';
+    tr.querySelector('.rcBook').onchange=totals;tr.querySelector('.rcQty').oninput=totals;
+    document.getElementById('rcBooks').appendChild(tr);totals();
+  };
+  window.rcTotals=totals;
+  window.openReceivingCopy=function(id){
+    const r=bookRequests.find(x=>String(x.requestId)===String(id));
+    if(!r){alert('Request not found. Refresh the list.');return}
+    // already released: nothing to edit, print what was actually released
+    if(FIN.indexOf(String(r.status||'').trim().toLowerCase())>=0){printReceivingCopy(id);return}
+    if(!adminAuthed()){openAdminLogin();return}
+    if(!inventory.length){alert('Inventory is still loading. Please try again in a moment.');return}
+    rcId=String(id);rcOrig={};
+    const items=r.items||[{bookRow:r.bookRow,bookTitle:r.bookTitle,qty:r.qty}];
+    items.forEach(i=>{rcOrig[String(i.bookRow)]=(rcOrig[String(i.bookRow)]||0)+Number(i.qty||0)});
+    const dr=window._rcvDraft[rcId];
+    document.getElementById('rcInfo').innerHTML='<b>'+esc(r.requestId)+'</b> — '+esc(r.requestor)+' / '+esc(r.school||r.organization);
+    document.getElementById('rcBooks').innerHTML='';
+    (dr?dr.items:items).forEach(i=>rcAddRow(i.bookRow,i.qty));
+    document.getElementById('rcType').value=dr?dr.type:'Picked Up';
+    document.getElementById('rcDate').value=(dr&&dr.date)||new Date().toISOString().slice(0,10);
+    document.getElementById('rcRemarks').value=(dr&&dr.remarks)||'';
+    totals();
+    document.getElementById('receivingCopyModal').classList.add('open');
+  };
+  window.rcPrint=function(){
+    const rows=[...document.querySelectorAll('#rcBooks tr')],items=[],seen=new Set();
+    if(!rows.length){alert('Add at least one book.');return}
+    for(const tr of rows){
+      const row=tr.querySelector('.rcBook').value,q=Number(tr.querySelector('.rcQty').value||0);
+      if(!row||q<=0){alert('Select a book and an actual quantity of at least 1 for every row (or remove the row).');return}
+      if(seen.has(row)){alert('The same book is listed twice. Combine them into one row.');return}seen.add(row);
+      items.push({bookRow:row,qty:q});
+    }
+    const type=document.getElementById('rcType').value,date=document.getElementById('rcDate').value,remarks=document.getElementById('rcRemarks').value.trim();
+    window._rcvDraft[rcId]={items:items,type:type,date:date,remarks:remarks};   // remembered for the Final Release window
+    const r=bookRequests.find(x=>String(x.requestId)===rcId)||{};
+    const full=items.map(i=>{const b=inventory.find(z=>String(z.row)===String(i.bookRow));return {bookTitle:b?b.title:'',subject:b?b.subject:'',grade:b?b.grade:'',qty:i.qty}});
+    const orig=(r.items||[]).map(i=>i.bookTitle+' ×'+i.qty).join('; '),now=full.map(i=>i.bookTitle+' ×'+i.qty).join('; ');
+    printReceivingCopy(rcId,{items:full,status:type,date:date,original:orig!==now?orig:'',remarks:remarks});
   };
 })();
 </script>
