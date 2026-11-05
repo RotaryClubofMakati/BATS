@@ -585,7 +585,7 @@ function requestDate(v){if(!v)return '';const d=new Date(v);return isNaN(d)?Stri
 function renderBookRequests(){
  const body=document.getElementById('bookRequestsBody');if(!body)return;
  const q=key(document.getElementById('requestSearch')?.value||''),st=document.getElementById('requestStatusFilter')?.value||'',so=document.getElementById('requestSort')?.value||'newest';
- let a=bookRequests.filter(r=>{const rs=String(r.status||'Pending Approval').trim().toLowerCase(); const inProgress=['in progress','preparing','ready for pickup','released','completed','picked up','delivered'].includes(rs); return !inProgress && (!st||String(r.status||'')===st) && (!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,r.bookTitle,r.subject,r.grade,r.email].some(v=>key(v).includes(q)));});
+ let a=bookRequests.filter(r=>{const rs=String(r.status||'Pending Approval').trim().toLowerCase(); const inProgress=['approved','in progress','preparing','ready for pickup','released','completed','picked up','delivered'].includes(rs); return !inProgress && (!st||String(r.status||'')===st) && (!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,r.bookTitle,r.subject,r.grade,r.email].some(v=>key(v).includes(q)));});
  a.sort((x,y)=>{const dx=new Date(x.requestDate||0).getTime(),dy=new Date(y.requestDate||0).getTime();return so==='oldest'?dx-dy:dy-dx});
  body.innerHTML=a.map(r=>{const status=String(r.status||'Pending Approval').trim();const statusKey=status.toLowerCase();const pending=statusKey==='pending approval';const approved=statusKey==='approved';const ready=statusKey==='ready for pickup';const released=statusKey==='released';
  let actions='';
@@ -723,7 +723,7 @@ function renderProgress(){
  let a=bookRequests.filter(r=>
    (!st||String(r.status||'Pending Approval').trim()===st) &&
    (!pd||String(r.pickupDate||'')===pd) &&
-   String(r.status||'').trim().toLowerCase()!=='completed' &&
+   !['completed','pending approval','rejected',''].includes(String(r.status||'Pending Approval').trim().toLowerCase()) &&
    (!q||[r.requestId,r.requestor,r.organization,r.school,r.bookTitle,r.subject,r.grade].some(v=>key(v).includes(q)))
  );
  a.sort((x,y)=>new Date(y.updatedDate||y.requestDate||0)-new Date(x.updatedDate||x.requestDate||0));
@@ -1133,7 +1133,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   window.renderBookRequests=function(){
     const body=document.getElementById('bookRequestsBody');if(!body)return;
     const q=key(document.getElementById('requestSearch')?.value||''),st=document.getElementById('requestStatusFilter')?.value||'',so=document.getElementById('requestSort')?.value||'newest';
-    let a=bookRequests.filter(r=>{const rs=key(r.status||'Pending Approval');return (st?String(r.status||'Pending Approval')===st:!DONE.includes(rs))&&(!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,titleOf(r),r.subject,r.grade,r.email].some(v=>key(v).includes(q)))});
+    let a=bookRequests.filter(r=>{const rs=key(r.status||'Pending Approval');return ['pending approval','approved','rejected'].includes(rs)&&(!st||String(r.status||'Pending Approval')===st)&&(!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,titleOf(r),r.subject,r.grade,r.email].some(v=>key(v).includes(q)))});
     const cmp=(x,y)=>String(x||'').localeCompare(String(y||''),undefined,{numeric:true,sensitivity:'base'});
     const d=r=>new Date(r.requestDate||0).getTime();
     const sorts={newest:(x,y)=>d(y)-d(x),oldest:(x,y)=>d(x)-d(y),book:(x,y)=>cmp(titleOf(x),titleOf(y))||cmp(x.grade,y.grade),
@@ -1167,7 +1167,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     const wh=window.batsRole&&window.batsRole()==='warehouse';
     let a=bookRequests.filter(r=>{const k=key(r.status||'Pending Approval');
       if(k==='completed'||k==='rejected'&&!st)return false;
-      if(wh&&!st&&(k==='pending approval'||k==='approved'))return false;   // warehouse sees only requests sent by the supervisor
+      if(k==='pending approval'||k==='approved'||k==='rejected')return false;   // not yet approved: stays in Book Requests only
       return (!st||String(r.status||'Pending Approval').trim()===st)&&(!pd||String(r.pickupDate||'')===pd)&&(!q||[r.requestId,r.requestor,r.organization,r.school,titleOf(r),r.subject,r.grade].some(v=>key(v).includes(q)))});
     a.sort((x,y)=>String(x.preparingDate||'9999').localeCompare(String(y.preparingDate||'9999'))||new Date(y.updatedDate||0)-new Date(x.updatedDate||0));
     body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td><b>'+esc(titleOf(r))+'</b><br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num"><span class="qty-big">'+qtyOf(r)+'</span></td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status||'Pending Approval')+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+(line('Planned',r.preparingDate)+line('Prepared',r.preparedDate)||'—')+'</td><td>'+(line('Planned',r.pickupDate)+line('For pickup',r.readyDate)||'—')+'</td><td>'+(line('Picked up',r.pickedUpDate)+line('Delivered',r.deliveredDate)+line('Released',r.releaseDate)||'—')+'</td><td>'+esc(requestDate(r.updatedDate))+'<br><small>'+esc(r.handledBy||'')+'</small></td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
