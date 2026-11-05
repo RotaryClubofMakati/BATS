@@ -104,6 +104,13 @@ th{background:#edf3fa;position:sticky;top:0;z-index:2}.num{text-align:right}
 }
 </style>
 
+<style>
+#batsBusy{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200000;align-items:center;justify-content:center;cursor:wait}
+#batsBusy.show{display:flex}
+.bats-busy-box{background:#fff;border-radius:14px;padding:24px 30px;text-align:center;font-weight:700;color:#173b72;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.bats-spin{width:42px;height:42px;margin:0 auto 12px;border:4px solid #dbeafe;border-top-color:#2563eb;border-radius:50%;animation:batsSpin .8s linear infinite}
+@keyframes batsSpin{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
 <header>
@@ -195,7 +202,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
     <button id="tabInventory" class="tabbtn active" onclick="showTab('inventoryTab',this)">📚 Book Inventory</button>
     <button id="tabRequests" class="tabbtn" onclick="showTab('adminRequestTab',this)">📋 Book Requests</button>
     <button id="tabProgress" class="tabbtn" onclick="showTab('adminProgressTab',this)">⏳ In Progress</button>
-    <button id="tabCompleted" class="tabbtn" onclick="showTab('adminCompletedTab',this)">✅ Completed Released</button>
+    <button id="tabCompleted" class="tabbtn" onclick="showTab('adminCompletedTab',this)">✅ Completed Released</button><button id="tabCopyLink" type="button" class="tabbtn" style="background:#16a34a;color:#fff" onclick="copyRequestLink()" title="Copy the book request form link to send to a requestor">🔗 Copy Request Form Link</button>
   </div>
 
   <div id="inventoryTab" class="tab-panel active">
@@ -319,6 +326,30 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
 <div class="actions"><button class="gray" onclick="closeM('releaseModal')">Cancel</button><button onclick="releaseBook()">Release & Print Delivery Receipt</button></div>
 </div></div>
 
+<div class="modal" id="releaseRequestModal"><div class="box">
+<h2 style="margin-top:0">Release Whole Request</h2>
+<div class="small" id="rrInfo"></div>
+<div class="small" style="margin:6px 0 10px">All books in this request are released together on one delivery receipt.</div>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Book Title</th><th>Subject</th><th>Grade</th><th class="num">Qty to Release</th><th class="num">In Stock</th><th class="num">Value</th></tr></thead><tbody id="rrBooks"></tbody></table></div>
+<div id="rrWarn" style="color:#991b1b;font-weight:700;margin:8px 0"></div>
+<div class="form">
+<div><label>Date *</label><input id="rrDate" type="date"></div><div><label>Recipient *</label><input id="rrRecipient"></div>
+<div><label>Requesting Organization</label><input id="rrOrg"></div><div><label>Contact / Mobile</label><input id="rrContact"></div>
+<div class="full"><label>Address</label><input id="rrAddress"></div>
+<div class="full"><label>Purpose</label><input id="rrPurpose"></div>
+<div><label>Released By</label><input id="rrReleasedBy"></div><div><label>Checked / Authorized By</label><input id="rrChecked"></div>
+<div class="full"><label>Remarks</label><textarea id="rrRemarks"></textarea></div>
+</div>
+<div class="actions"><button class="gray" onclick="closeM('releaseRequestModal')">Cancel</button><button id="rrConfirm" onclick="confirmReleaseRequest()">Release All Books &amp; Print Delivery Receipt</button></div>
+</div></div>
+<div class="modal" id="editRequestModal"><div class="box" style="width:min(800px,100%)">
+<h2 style="margin-top:0">Edit Requested Books</h2>
+<div class="small" id="erInfo"></div>
+<div class="small" style="margin:6px 0 10px">Change the book titles or quantities after talking with the requestor. The Request No. and requestor details stay the same.</div>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Book Title</th><th>Quantity</th><th></th></tr></thead><tbody id="erBooks"></tbody></table></div>
+<button type="button" class="gray" style="margin-top:8px" onclick="addEditBookRow('',1)">＋ Add Another Book</button>
+<div class="actions"><button class="gray" onclick="closeM('editRequestModal')">Cancel</button><button id="erSave" class="green" onclick="saveEditRequest()">Save Changes</button></div>
+</div></div>
 <div class="modal" id="historyModal"><div class="box">
 <h2>Release History</h2>
 <div class="table-wrap"><table><thead><tr><th>Date</th><th>Recipient</th><th>Organization</th><th>Book</th><th>Subject</th><th>Grade</th><th>Qty</th><th>Total</th></tr></thead><tbody id="history"></tbody></table></div>
@@ -368,8 +399,17 @@ function postViaHiddenForm(payload){
    form.submit();
  });
 }
+let batsBusy=false;
+function showBusy(on,msg){let o=document.getElementById('batsBusy');if(!o){o=document.createElement('div');o.id='batsBusy';o.innerHTML='<div class="bats-busy-box"><div class="bats-spin"></div><div id="batsBusyMsg">Saving… please wait</div><div class="small">Do not close or click again.</div></div>';document.body.appendChild(o);}
+ document.getElementById('batsBusyMsg').textContent=msg||'Saving… please wait';o.classList.toggle('show',!!on);
+ document.querySelectorAll('button').forEach(b=>{if(on){if(!b.disabled){b.dataset.busyLock='1';b.disabled=true;}}else if(b.dataset.busyLock){b.disabled=false;delete b.dataset.busyLock;}});}
 async function apiPost(payload,auth=false){
- const body={...payload};
+ if(batsBusy)throw new Error('Please wait — the previous save is still in progress.');
+ batsBusy=true;showBusy(true,payload&&payload.action==='bookRequest'?'Submitting your request… please wait':'Saving… please wait');
+ try{return await apiPostInner(payload,auth);}finally{batsBusy=false;showBusy(false);}
+}
+async function apiPostInner(payload,auth=false){
+ const body={...payload,clientKey:(payload&&payload.clientKey)||(Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10))};
  if(auth && adminToken) body.token=adminToken;
  try{
    const r=await fetch(API_URL,{method:"POST",mode:"cors",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
@@ -487,7 +527,7 @@ async function submitBookRequest(){
  if(!items.length){alert('Add at least one book to your request.');return}
  const records=[];
  for(const el of items){const book=(window.publicBooksCache||[]).find(x=>String(x.row)===String(el.querySelector('.pb-book').value));const qty=Number(el.querySelector('.pb-qty').value||0);if(!book||qty<=0||qty>Number(book.qty||0)){alert('Please select an available book and valid quantity for every book request.');return}records.push({...base,subject:book.subject,grade:book.grade,bookRow:book.row,bookTitle:book.title,qty});}
- try{const ids=[];for(const r of records){const d=await apiPost({action:'bookRequest',record:r},false);ids.push(d.requestId||('REQ-'+Date.now()));}const box=document.getElementById('requestSuccess');box.innerHTML='<strong>Request submitted successfully.</strong><br>'+ids.length+' book request(s) submitted.<br>Request No.: '+ids.map(esc).join(', ')+'<br>Your requests are now pending approval.';box.classList.add('show');}catch(e){alert('The request form could not be submitted.\n\n'+e.message);}
+ try{const d=await apiPost({action:'bookRequest',records:records},false);const id=d.requestId||'';const box=document.getElementById('requestSuccess');box.innerHTML='<strong>Request submitted successfully.</strong><br>Request No.: '+esc(id||'(see confirmation)')+'<br>'+records.length+' book(s) in this request:<ol style="margin:6px 0 6px 18px">'+records.map(r=>'<li>'+esc(r.bookTitle)+' — '+esc(r.subject)+' / Grade '+esc(r.grade)+' — <b>'+r.qty+'</b> pcs</li>').join('')+'</ol>Total: <b>'+records.reduce((s,r)=>s+r.qty,0)+'</b> pcs. Your request is now pending approval.';box.classList.add('show');}catch(e){alert('The request form could not be submitted.\n\n'+e.message);}
 }
 async function loadBookRequests(){if(!adminAuthed()){return}
  const body=document.getElementById('bookRequestsBody');
@@ -496,23 +536,25 @@ async function loadBookRequests(){if(!adminAuthed()){return}
  try{
    const d=await apiGet('bookRequests',true);
    const raw=Array.isArray(d.requests)?d.requests:[];
-   // Keep ONE record per Request No. so the same request is never duplicated
-   // between the Book Requests and In Progress views.
+   // ONE request per Request No.; every book row of that request goes into r.items.
    const unique=new Map();
    raw.forEach(r=>{
      const id=String(r.requestId||'').trim();
      if(!id)return;
-     const old=unique.get(id);
-     if(!old || new Date(r.updatedDate||r.requestDate||0)>=new Date(old.updatedDate||old.requestDate||0)){
-       unique.set(id,r);
-     }
+     const item={bookRow:r.bookRow,bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:Number(r.qty||0)};
+     const g=unique.get(id);
+     if(!g){unique.set(id,{...r,items:[item]});return;}
+     g.items.push(item);
+     if(new Date(r.updatedDate||0)>new Date(g.updatedDate||0)){Object.assign(g,{...r,items:g.items});}
    });
+   unique.forEach(g=>{g.totalQty=g.items.reduce((s,i)=>s+i.qty,0);g.qty=g.totalQty;g.bookTitle=g.items.map(i=>i.bookTitle).join(', ');g.subject=[...new Set(g.items.map(i=>i.subject))].join(', ');g.grade=[...new Set(g.items.map(i=>i.grade))].join(', ');});
    bookRequests=[...unique.values()];
    renderBookRequests();
    renderProgress();
  }catch(e){body.innerHTML='<tr><td colspan="8" class="request-empty">Could not load requests: '+esc(e.message)+'</td></tr>';}
 }
 function requestStatusClass(st){const k=key(st);if(k==='pending approval')return 'status-pending';if(k==='approved')return 'status-approved';if(k==='preparing')return 'status-approved';if(k==='rejected')return 'status-rejected';if(k==='ready for pickup')return 'status-ready';if(k==='released')return 'status-released';if(k==='completed')return 'status-completed';return '';}
+function booksCell(r){const it=r.items||[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}];if(it.length===1)return esc(it[0].bookTitle)+'<br><small>'+esc(it[0].subject)+' / Grade '+esc(it[0].grade)+'</small>';return '<b>'+it.length+' books</b><ol style="margin:4px 0 0 16px;padding:0">'+it.map(i=>'<li>'+esc(i.bookTitle)+' <small>('+esc(i.subject)+' / Gr. '+esc(i.grade)+') × '+Number(i.qty||0)+'</small></li>').join('')+'</ol>';}
 function requestDate(v){if(!v)return '';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString('en-PH');}
 function renderBookRequests(){
  const body=document.getElementById('bookRequestsBody');if(!body)return;
@@ -524,8 +566,9 @@ function renderBookRequests(){
  if(pending) actions+='<button type="button" class="green" data-request-action="approve" data-request-id="'+esc(r.requestId)+'">Approve</button><button type="button" class="gray" data-request-action="reject" data-request-id="'+esc(r.requestId)+'">Reject</button>';
  if(approved||ready) actions+='<button onclick="releaseRequestedBook('+JSON.stringify(r.requestId)+')">Release</button>';
  if(released) actions+='<button type="button" class="gray" onclick="setRequestStatus('+JSON.stringify(r.requestId)+',\'Completed\')">Complete</button>';
+  actions+=(canEditRequest(r)?'<button type="button" data-request-action="edit" data-request-id="'+esc(String(r.requestId||''))+'">✏️ Edit Books</button>':'');
   actions+='<button type="button" class="red" data-request-action="delete" data-request-id="'+esc(r.requestId)+'">Delete</button>';
- return '<tr><td><a href="#" data-request-details="'+esc(String(r.requestId||''))+'" style="font-weight:700;text-decoration:underline;cursor:pointer">'+esc(r.requestId)+'</a></td>'+ '<td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(r.requestor)+'<br><small>'+esc(r.organization)+'</small></td><td>'+esc(r.school)+'</td><td>'+esc(r.bookTitle)+'<br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num">'+Number(r.qty||0).toLocaleString()+'</td><td><span class="status-pill '+requestStatusClass(status)+'">'+esc(status)+'</span></td><td><div class="request-actions">'+actions+'</div></td></tr>';}).join('')||'<tr><td colspan="8" class="request-empty">No requests found.</td></tr>';
+ return '<tr><td><a href="#" data-request-details="'+esc(String(r.requestId||''))+'" style="font-weight:700;text-decoration:underline;cursor:pointer">'+esc(r.requestId)+'</a></td>'+ '<td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(r.requestor)+'<br><small>'+esc(r.organization)+'</small></td><td>'+esc(r.school)+'</td><td>'+booksCell(r)+'</td><td class="num">'+Number(r.qty||0).toLocaleString()+'</td><td><span class="status-pill '+requestStatusClass(status)+'">'+esc(status)+'</span></td><td><div class="request-actions">'+actions+'</div></td></tr>';}).join('')||'<tr><td colspan="8" class="request-empty">No requests found.</td></tr>';
 }
 async function mutateRequestViaGet(action,requestId,status){
   action=String(action||'').trim();
@@ -564,11 +607,68 @@ async function deleteBookRequest(requestId){
 }
 function releaseRequestedBook(requestId){
  const r=bookRequests.find(x=>String(x.requestId)===String(requestId));if(!r){alert('Request not found. Refresh the requests list.');return}
- const x=inventory.find(z=>String(z.row)===String(r.bookRow));if(!x){alert('The requested book is no longer in the current inventory.');return}
- if(Number(r.qty)>Number(x.qty)){alert('Not enough stock to release this request. Requested: '+r.qty+' | Available: '+x.qty);return}
- activeRequestId=String(requestId);openRelease();
- setTimeout(()=>{document.getElementById('xDate').value=new Date().toISOString().slice(0,10);document.getElementById('xRecipient').value=r.requestor||'';document.getElementById('xOrg').value=r.organization||'';document.getElementById('xAddress').value=r.address||'';document.getElementById('xContact').value=r.mobile||'';document.getElementById('xPurpose').value='Book Request '+r.requestId+(r.purpose?' — '+r.purpose:'');document.getElementById('xQty').value=r.qty;document.getElementById('xReleasedBy').value='';document.getElementById('xChecked').value='';document.getElementById('xRemarks').value='Released against '+r.requestId;document.getElementById('xSubject').value=r.subject||'';document.getElementById('xGrade').value=r.grade||'';fillReleaseBooks();document.getElementById('xBook').value=String(x.row);releaseInfo()},50);
+ const items=r.items||[{bookRow:r.bookRow,bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}];
+ const short=[];
+ const lines=items.map(i=>{const x=inventory.find(z=>String(z.row)===String(i.bookRow));const stock=x?Number(x.qty):0;if(!x||Number(i.qty)>stock)short.push(i.bookTitle+' (need '+i.qty+', stock '+stock+')');return {...i,x,stock,price:x?Number(x.price||0):0};});
+ activeRequestId=String(requestId);
+ const today=new Date().toISOString().slice(0,10);
+ document.getElementById('rrInfo').innerHTML='<b>'+esc(r.requestId)+'</b> — '+esc(r.requestor)+' / '+esc(r.school||r.organization);
+ document.getElementById('rrDate').value=today;
+ document.getElementById('rrRecipient').value=r.requestor||'';
+ document.getElementById('rrOrg').value=r.organization||'';
+ document.getElementById('rrAddress').value=r.address||'';
+ document.getElementById('rrContact').value=r.mobile||'';
+ document.getElementById('rrPurpose').value='Book Request '+r.requestId+(r.purpose?' — '+r.purpose:'');
+ document.getElementById('rrReleasedBy').value='';document.getElementById('rrChecked').value='';
+ document.getElementById('rrRemarks').value='Released against '+r.requestId;
+ document.getElementById('rrBooks').innerHTML=lines.map((i,n)=>'<tr><td>'+(n+1)+'</td><td><b>'+esc(i.bookTitle)+'</b></td><td>'+esc(i.subject)+'</td><td>'+esc(i.grade)+'</td><td class="num">'+Number(i.qty).toLocaleString()+'</td><td class="num" style="color:'+(i.x&&i.qty<=i.stock?'#166534':'#991b1b')+'">'+i.stock.toLocaleString()+'</td><td class="num">'+money(i.qty*i.price)+'</td></tr>').join('')+
+  '<tr><td colspan="4" style="text-align:right"><b>Total</b></td><td class="num"><b>'+lines.reduce((s,i)=>s+Number(i.qty),0).toLocaleString()+'</b></td><td></td><td class="num"><b>'+money(lines.reduce((s,i)=>s+i.qty*i.price,0))+'</b></td></tr>';
+ document.getElementById('rrWarn').textContent=short.length?'Not enough stock: '+short.join('; '):'';
+ document.getElementById('rrConfirm').disabled=!!short.length;
+ window._rrLines=lines;
+ document.getElementById('releaseRequestModal').classList.add('open');
 }
+async function confirmReleaseRequest(){
+ const lines=window._rrLines||[],v=id=>document.getElementById(id).value.trim();
+ const base={date:v('rrDate'),recipient:v('rrRecipient'),organization:v('rrOrg'),address:v('rrAddress'),contact:v('rrContact'),purpose:v('rrPurpose'),releasedBy:v('rrReleasedBy'),checkedBy:v('rrChecked'),remarks:v('rrRemarks')};
+ if(!base.recipient){alert('Recipient is required.');return}
+ const records=lines.map(i=>({...base,row:i.x.row,subject:i.subject,grade:i.grade,title:i.bookTitle,qty:Number(i.qty),price:i.price,total:Number(i.qty)*i.price}));
+ const btn=document.getElementById('rrConfirm');btn.disabled=true;
+ try{
+  setStatus('Releasing all books of '+activeRequestId+'...');
+  const d=await apiPost({action:'releaseRequest',requestId:activeRequestId,records:records},true);
+  await apiPost({action:'updateBookRequest',requestId:activeRequestId,status:'Released',releaseId:d.releaseId||'',releaseDate:base.date},true);
+  closeM('releaseRequestModal');const rid=activeRequestId;activeRequestId='';await sync();await loadBookRequests();
+  setStatus('Request '+rid+' released ('+records.length+' book titles).');
+  printReceipt({...base,releaseId:d.releaseId||'',items:records,qty:records.reduce((s,r)=>s+r.qty,0)});
+ }catch(e){alert('Could not release the request:\n'+e.message)}finally{btn.disabled=false}
+}
+function canEditRequest(r){const role=(window.batsRole?window.batsRole():'admin');const k=String(r.status||'').toLowerCase();return (role==='admin'||role==='supervisor')&&!['released','completed','picked up','delivered','rejected'].includes(k);}
+let editRequestId='';
+function editBookOptions(sel){return '<option value="">— Select book —</option>'+inventory.slice().sort((a,b)=>String(a.title).localeCompare(String(b.title))).map(b=>'<option value="'+esc(String(b.row))+'"'+(String(b.row)===String(sel)?' selected':'')+'>'+esc(b.title)+' — '+esc(b.subject)+' / Gr. '+esc(b.grade)+' (stock '+Number(b.qty||0)+')</option>').join('');}
+function addEditBookRow(row,qty,title){const tb=document.getElementById('erBooks');const tr=document.createElement('tr');const missing=row&&!inventory.find(b=>String(b.row)===String(row));
+ tr.innerHTML='<td class="erN"></td><td><select class="erBook" style="width:100%">'+editBookOptions(row)+(missing?'<option value="'+esc(String(row))+'" selected>'+esc(title||'Book')+' (not in inventory)</option>':'')+'</select></td><td><input class="erQty" type="number" min="1" value="'+(qty||1)+'" style="width:90px"></td><td><button type="button" class="red" onclick="this.closest(\'tr\').remove();renumberEditBooks()">Remove</button></td>';
+ tb.appendChild(tr);renumberEditBooks();}
+function renumberEditBooks(){document.querySelectorAll('#erBooks tr').forEach((tr,i)=>tr.querySelector('.erN').textContent=i+1);}
+function openEditRequest(id){const r=bookRequests.find(x=>String(x.requestId)===String(id));if(!r){alert('Request not found. Refresh the list.');return}
+ if(!canEditRequest(r)){alert('This request can no longer be edited.');return}
+ if(!inventory.length){alert('Inventory is still loading. Please try again in a moment.');return}
+ editRequestId=String(id);
+ document.getElementById('erInfo').innerHTML='<b>'+esc(r.requestId)+'</b> — '+esc(r.requestor)+' ('+esc(r.organization)+') • '+esc(r.school)+' • '+esc(r.mobile);
+ document.getElementById('erBooks').innerHTML='';
+ (r.items||[r]).forEach(i=>addEditBookRow(i.bookRow,i.qty,i.bookTitle));
+ document.getElementById('editRequestModal').classList.add('open');}
+async function saveEditRequest(){const rows=[...document.querySelectorAll('#erBooks tr')];if(!rows.length){alert('Keep at least one book in the request.');return}
+ const r=bookRequests.find(x=>String(x.requestId)===editRequestId)||{};const old=r.items||[];const items=[];const seen=new Set();
+ for(const tr of rows){const val=tr.querySelector('.erBook').value,q=Number(tr.querySelector('.erQty').value||0);if(!val||q<=0){alert('Select a book and a quantity of at least 1 for every row.');return}
+  if(seen.has(val)){alert('The same book is listed twice. Combine them into one row.');return}seen.add(val);
+  const b=inventory.find(z=>String(z.row)===String(val))||old.find(o=>String(o.bookRow)===String(val));if(!b){alert('Book not found.');return}
+  const title=b.title||b.bookTitle;if(b.title&&q>Number(b.qty||0)){alert('Not enough stock for "'+title+'". Available: '+b.qty);return}
+  items.push({bookRow:val,bookTitle:title,subject:b.subject,grade:b.grade,qty:q});}
+ if(!confirm('Save these changes to request '+editRequestId+'?\n\n'+items.map((i,n)=>(n+1)+'. '+i.bookTitle+' × '+i.qty).join('\n')))return;
+ const btn=document.getElementById('erSave');btn.disabled=true;
+ try{setStatus('Saving changes to '+editRequestId+'...');await apiPost({action:'editRequestItems',requestId:editRequestId,records:items},true);await new Promise(x=>setTimeout(x,600));closeM('editRequestModal');await loadBookRequests();renderProgress();setStatus('Request '+editRequestId+' updated.');alert('Request '+editRequestId+' updated. Same Request No., '+items.length+' book(s).');}
+ catch(e){alert('Could not save the changes:\n'+e.message)}finally{btn.disabled=false}}
 function renderCompleted(){
  const body=document.getElementById('completedBody');if(!body)return;
  const q=key(document.getElementById('completedSearch')?.value||''),rd=document.getElementById('completedReleaseFilter')?.value||'',so=document.getElementById('completedSort')?.value||'newest';
@@ -578,7 +678,7 @@ function renderCompleted(){
    return status==='completed' && (!rd||release===rd) && (!q||[r.requestId,r.requestor,r.organization,r.school,r.bookTitle,r.subject,r.grade].some(v=>key(v).includes(q)));
  });
  a.sort((x,y)=>{const dx=new Date(x.releaseDate||x.updatedDate||x.requestDate||0).getTime(),dy=new Date(y.releaseDate||y.updatedDate||y.requestDate||0).getTime();return so==='oldest'?dx-dy:dy-dx});
- body.innerHTML=a.map(r=>'<tr><td><strong>'+esc(r.requestId)+'</strong></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td>'+esc(r.bookTitle)+'<br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num">'+Number(r.qty||0).toLocaleString()+'</td><td><span class="status-pill status-completed">Completed</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(requestDate(r.pickupDate))+'</td><td>'+esc(requestDate(r.releaseDate))+'</td><td>'+esc(requestDate(r.updatedDate))+'</td><td><button type="button" class="red" data-request-action="delete" data-request-id="'+esc(String(r.requestId||''))+'">Delete</button></td></tr>').join('')||'<tr><td colspan="10" class="request-empty">No completed released requests found.</td></tr>';
+ body.innerHTML=a.map(r=>'<tr><td><strong>'+esc(r.requestId)+'</strong></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td>'+booksCell(r)+'</td><td class="num">'+Number(r.qty||0).toLocaleString()+'</td><td><span class="status-pill status-completed">Completed</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(requestDate(r.pickupDate))+'</td><td>'+esc(requestDate(r.releaseDate))+'</td><td>'+esc(requestDate(r.updatedDate))+'</td><td><button type="button" class="red" data-request-action="delete" data-request-id="'+esc(String(r.requestId||''))+'">Delete</button></td></tr>').join('')||'<tr><td colspan="10" class="request-empty">No completed released requests found.</td></tr>';
 }
 
 function renderProgress(){
@@ -602,11 +702,11 @@ function renderProgress(){
  );
  a.sort((x,y)=>new Date(y.updatedDate||y.requestDate||0)-new Date(x.updatedDate||x.requestDate||0));
 
- body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'" title="View request details">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td>'+esc(r.bookTitle)+'<br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num">'+Number(r.qty||0)+'</td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status)+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(requestDate(r.preparingDate))+'</td><td>'+esc(requestDate(r.pickupDate))+'</td><td>'+esc(requestDate(r.releaseDate))+'</td><td>'+esc(requestDate(r.updatedDate))+'</td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
+ body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'" title="View request details">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td>'+booksCell(r)+'</td><td class="num">'+Number(r.qty||0)+'</td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status)+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(requestDate(r.preparingDate))+'</td><td>'+esc(requestDate(r.pickupDate))+'</td><td>'+esc(requestDate(r.releaseDate))+'</td><td>'+esc(requestDate(r.updatedDate))+'</td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
 }
-function progressActions(r){const id=JSON.stringify(r.requestId),k=String(r.status||'Pending Approval').toLowerCase();let a='';if(k==='pending approval')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Approve</button><button type="button" class="gray" onclick="setRequestStatus('+id+',\'Rejected\')">Reject</button>';if(k==='approved')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Start Processing</button>';if(k==='in progress'||k==='preparing')a+='<button type="button" onclick="openPickupStatus('+id+')">Set Pickup Date</button>';if(k==='ready for pickup')a+='<button type="button" onclick="releaseRequestedBook('+id+')">Release</button>';if(k==='released'||k.indexOf('released')>=0||r.releaseDate)a+='<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>';return a+'<button type="button" class="red" data-request-action="delete" data-request-id="'+esc(String(r.requestId||''))+'">Delete</button>'}
+function progressActions(r){const id=JSON.stringify(r.requestId),k=String(r.status||'Pending Approval').toLowerCase();let a='';if(k==='pending approval')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Approve</button><button type="button" class="gray" onclick="setRequestStatus('+id+',\'Rejected\')">Reject</button>';if(k==='approved')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Start Processing</button>';if(k==='in progress'||k==='preparing')a+='<button type="button" onclick="openPickupStatus('+id+')">Set Pickup Date</button>';if(k==='ready for pickup')a+='<button type="button" onclick="releaseRequestedBook('+id+')">Release</button>';if(k==='released'||k.indexOf('released')>=0||r.releaseDate)a+='<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>';return a+(canEditRequest(r)?'<button type="button" data-request-action="edit" data-request-id="'+esc(String(r.requestId||''))+'">✏️ Edit Books</button>':'')+'<button type="button" class="red" data-request-action="delete" data-request-id="'+esc(String(r.requestId||''))+'">Delete</button>'}
 let processingRequestId='';
-document.addEventListener('click',function(e){const b=e.target.closest('button[data-request-action][data-request-id]');if(!b)return;e.preventDefault();e.stopPropagation();const a=b.getAttribute('data-request-action'),id=b.getAttribute('data-request-id');if(a==='approve')openProcessingSetup(id);else if(a==='reject')setRequestStatus(id,'Rejected');else if(a==='delete')deleteBookRequest(id);else if(a==='complete')completeRequestDirect(id);});
+document.addEventListener('click',function(e){const b=e.target.closest('button[data-request-action][data-request-id]');if(!b)return;e.preventDefault();e.stopPropagation();const a=b.getAttribute('data-request-action'),id=b.getAttribute('data-request-id');if(a==='approve')openProcessingSetup(id);else if(a==='reject')setRequestStatus(id,'Rejected');else if(a==='delete')deleteBookRequest(id);else if(a==='complete')completeRequestDirect(id);else if(a==='edit')openEditRequest(id);});
 function bindProgressDeleteFallback(){const body=document.getElementById('progressBody');if(!body||body.dataset.deleteBound==='1')return;body.dataset.deleteBound='1';body.addEventListener('click',function(e){const b=e.target.closest('button[data-request-action="delete"]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();deleteBookRequest(b.getAttribute('data-request-id'));});}
 function openProcessingSetup(id){
   const r=bookRequests.find(x=>String(x.requestId)===String(id));
@@ -691,7 +791,7 @@ function addManualBookItem(){const w=document.getElementById('manualBookItems');
 function removeManualBookItem(id){const el=document.querySelector('[data-manual-book="'+id+'"]');if(el)el.remove();document.querySelectorAll('#manualBookItems .manual-book-item').forEach((el,i)=>el.querySelector('strong').textContent='Book #'+(i+1))}
 function populateManualBookItem(id){const el=document.querySelector('[data-manual-book="'+id+'"]');if(!el)return;const s=key(el.querySelector('.mb-subject').value),g=key(el.querySelector('.mb-grade').value),a=inventory.filter(x=>Number(x.qty)>0&&(!s||key(x.subject)===s)&&(!g||key(x.grade)===g));el.querySelector('.mb-book').innerHTML='<option value="">Select Book</option>'+a.map(x=>'<option value="'+x.row+'">'+esc(x.title)+' — Stock '+x.qty+'</option>').join('')}
 function openManualRequest(){document.getElementById('mRequestDate').value=new Date().toISOString().slice(0,10);document.getElementById('mPickupDate').value='';['mRequestor','mOrg','mMobile','mEmail','mSchool','mAddress','mPrincipal','mPurpose'].forEach(id=>document.getElementById(id).value='');document.getElementById('mLevel').value='';document.getElementById('mStatus').value='Pending Approval';manualBookItemCounter=0;document.getElementById('manualBookItems').innerHTML='';addManualBookItem();document.getElementById('manualRequestModal').classList.add('open')}
-async function saveManualRequest(){const items=[...document.querySelectorAll('#manualBookItems .manual-book-item')];if(!items.length){alert('Add at least one book.');return}const base={requestDate:document.getElementById('mRequestDate').value,pickupDate:document.getElementById('mPickupDate').value,email:document.getElementById('mEmail').value.trim(),organization:document.getElementById('mOrg').value.trim(),requestor:document.getElementById('mRequestor').value.trim(),mobile:document.getElementById('mMobile').value.trim(),address:document.getElementById('mAddress').value.trim(),school:document.getElementById('mSchool').value.trim(),principal:document.getElementById('mPrincipal').value.trim(),level:document.getElementById('mLevel').value,purpose:document.getElementById('mPurpose').value.trim(),status:document.getElementById('mStatus').value};if(!base.requestor||!base.organization||!base.address||!base.school||!base.level){alert('Requestor, Organization, Address, School / Library and Education Level are required.');return}const records=[];for(const el of items){const x=inventory.find(z=>String(z.row)===String(el.querySelector('.mb-book').value)),q=Number(el.querySelector('.mb-qty').value||0);if(!x||q<=0||q>x.qty){alert('Please select an available book and valid quantity for every book.');return}records.push({...base,bookRow:x.row,qty:q})}try{const ids=[];for(const r of records){const d=await apiPost({action:'bookRequestAdmin',record:r},true);if(d&&d.requestId)ids.push(d.requestId)}closeM('manualRequestModal');await loadBookRequests();renderProgress();alert(ids.length+' book request(s) added successfully.\n\nRequest No.: '+ids.join(', '))}catch(e){alert('Could not save the book request(s):\n'+e.message)}}
+async function saveManualRequest(){const items=[...document.querySelectorAll('#manualBookItems .manual-book-item')];if(!items.length){alert('Add at least one book.');return}const base={requestDate:document.getElementById('mRequestDate').value,pickupDate:document.getElementById('mPickupDate').value,email:document.getElementById('mEmail').value.trim(),organization:document.getElementById('mOrg').value.trim(),requestor:document.getElementById('mRequestor').value.trim(),mobile:document.getElementById('mMobile').value.trim(),address:document.getElementById('mAddress').value.trim(),school:document.getElementById('mSchool').value.trim(),principal:document.getElementById('mPrincipal').value.trim(),level:document.getElementById('mLevel').value,purpose:document.getElementById('mPurpose').value.trim(),status:document.getElementById('mStatus').value};if(!base.requestor||!base.organization||!base.address||!base.school||!base.level){alert('Requestor, Organization, Address, School / Library and Education Level are required.');return}const records=[];for(const el of items){const x=inventory.find(z=>String(z.row)===String(el.querySelector('.mb-book').value)),q=Number(el.querySelector('.mb-qty').value||0);if(!x||q<=0||q>x.qty){alert('Please select an available book and valid quantity for every book.');return}records.push({...base,bookRow:x.row,qty:q})}try{const d=await apiPost({action:'bookRequestAdmin',records:records},true);closeM('manualRequestModal');await loadBookRequests();renderProgress();alert('Request '+((d&&d.requestId)||'')+' added with '+records.length+' book(s).')}catch(e){alert('Could not save the book request(s):\n'+e.message)}}
 async function openPickupStatus(id){const r=bookRequests.find(x=>String(x.requestId)===String(id));if(!r){alert('Request not found. Refresh the requests list.');return}const d=prompt('Pickup date (YYYY-MM-DD):',r?.pickupDate||new Date().toISOString().slice(0,10));if(d===null)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert('Use YYYY-MM-DD.');return}if(r.preparingDate&&d<r.preparingDate){alert('Pickup date cannot be earlier than the preparing date.');return}try{await apiPost({action:'updateBookRequest',requestId:id,status:'Ready for Pickup',preparingDate:r.preparingDate||'',pickupDate:d},true);await loadBookRequests();renderProgress();alert('Request '+id+' is now Ready for Pickup on '+d+'.')}catch(e){alert('Could not set pickup status: '+e.message)}}
 function printRequest(){const ids=['qEmail','qOrg','qRequestor','qMobile','qAddress','qSchool','qPrincipal','qSchoolContact','qStudents','qLevel','qPurpose'];const labels=['Email','Organization / Rotary Club','Requestor','Mobile','Address','Beneficiary School / Library','Principal / Head','School Contact','Number of Students','Education Level','Purpose / Remarks'];let html='<h1>BOOKS ACROSS THE SEAS — BOOK REQUEST</h1><p>Date: '+new Date().toLocaleDateString('en-PH')+'</p>';ids.forEach((id,i)=>html+='<p><strong>'+labels[i]+':</strong> '+esc(document.getElementById(id).value)+'</p>');html+='<h3>Books Requested</h3><ol>';document.querySelectorAll('#publicBookItems .book-request-item').forEach(el=>{const b=el.querySelector('.pb-book').selectedOptions[0],q=el.querySelector('.pb-qty').value;html+='<li>'+esc(b?b.text:'')+' — Quantity: '+esc(q)+'</li>';});html+='</ol>';const w=window.open('','_blank','width=800,height=900');w.document.write('<html><head><title>Book Request</title><style>body{font-family:Arial;padding:40px;line-height:1.6}h1{color:#173b72}p{border-bottom:1px solid #ddd;padding:8px}</style></head><body>'+html+'</body></html>');w.document.close();setTimeout(()=>w.print(),400);}
 function reportMonthNow(){return new Date().toISOString().slice(0,7)}
@@ -761,7 +861,7 @@ function printReceipt(r){
  '<div class="ov ov-bearer">'+esc(r.releasedBy)+'</div><div class="ov ov-beneficiary">'+esc(r.recipient)+'</div><div class="ov ov-address">'+esc(r.address)+'</div>'+
  '<div class="ov ov-tel">'+esc(r.contact)+'</div><div class="ov ov-mobile">'+esc(r.contact)+'</div><div class="ov ov-requesting">'+esc(r.purpose)+'</div>'+
  '<div class="ov ov-org">'+esc(r.organization)+'</div><div class="ov ov-orgaddr">'+esc(r.address)+'</div><div class="ov ov-contact">'+esc(r.contact)+'</div><div class="ov ov-mobile2">'+esc(r.contact)+'</div>'+
- '<div class="ov ov-levels">'+esc(r.subject)+' • Grade '+esc(r.grade)+' • '+esc(r.title)+' • '+esc(r.qty)+' book(s)</div>'+
+ '<div class="ov ov-levels">'+(r.items&&r.items.length?r.items.map((i,n)=>(n+1)+'. '+esc(i.title)+' ('+esc(i.subject)+' / Gr. '+esc(i.grade)+') × '+esc(i.qty)).join('<br>'):esc(r.subject)+' • Grade '+esc(r.grade)+' • '+esc(r.title)+' • '+esc(r.qty)+' book(s)')+'</div>'+
  '<div class="ov ov-received">'+esc(r.recipient)+'</div><div class="ov ov-contact2">'+esc(r.contact)+'</div><div class="ov ov-mobile3">'+esc(r.contact)+'</div>'+
  '<div class="ov ov-issued">'+esc(r.releasedBy)+'</div><div class="ov ov-checked">'+esc(r.checkedBy)+'</div><div class="ov ov-released">'+esc(r.releasedBy)+'</div></div>';
  const w=window.open("","_blank","width=900,height=1000");w.document.write('<html><head><title>Delivery Receipt</title><style>'+document.querySelector("style").innerHTML+'.portal-home{max-width:1050px;margin:30px auto}.portal-hero{background:linear-gradient(135deg,#173b72,#2563eb);color:#fff;border-radius:18px;padding:34px;margin-bottom:18px;box-shadow:0 8px 30px rgba(23,59,114,.18)}.portal-kicker{font-size:12px;font-weight:800;letter-spacing:1.5px;opacity:.9}.portal-hero h2{font-size:34px;margin:8px 0 4px}.portal-hero p{font-size:20px;margin:0 0 12px}.portal-note{max-width:720px;line-height:1.6;opacity:.95}.portal-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.portal-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 4px 18px rgba(0,0,0,.05)}.portal-icon{font-size:34px}.portal-card h3{margin:10px 0 8px;font-size:22px}.portal-card p{color:var(--muted);line-height:1.55;min-height:62px}.admin-banner{background:#eef5ff;border:1px solid #bfdbfe;border-radius:14px;padding:15px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:15px}.admin-banner strong{display:block;color:#173b72}.admin-banner span{display:block;font-size:12px;color:#64748b;margin-top:3px}.admin-actions{display:flex;gap:8px;flex-wrap:wrap}.login-error{display:none;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-top:12px}.login-error.show{display:block}@media(max-width:800px){.portal-cards{grid-template-columns:1fr}.admin-banner{align-items:flex-start;flex-direction:column}}</style></head><body>'+h+'<script>window.onload=()=>setTimeout(()=>window.print(),600)<\\/script></body></html>');w.document.close();
@@ -803,7 +903,7 @@ window.addEventListener("load",()=>{document.getElementById('portalHome').style.
 <div id="requestDetailsModal" class="modal" aria-hidden="true">
  <div class="modal-card" style="max-width:900px">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-   <div><h2 style="margin:0">Request Details</h2><div class="small">Complete details for this book request</div></div>
+   <div><h2 style="margin:0">Request Details</h2><div class="small">Requestor details and every book in this request</div></div>
    <button type="button" class="gray" onclick="closeRequestDetails()">✕ Close</button>
   </div>
   <div id="requestDetailsBody" style="margin-top:18px;max-height:65vh;overflow:auto"></div>
@@ -832,6 +932,7 @@ function openRequestDetails(id){
     return keyFound ? r[keyFound] : '';
   };
   const description=getField('purpose','description','remarks','purposeRemarks','purpose_remarks','Purpose / Remarks','Purpose/Remarks');
+  const items=r.items||[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}];
   const education=getField('educationLevel','level','education','Education Level');
 
   document.getElementById('requestDetailsBody').innerHTML=`
@@ -847,14 +948,16 @@ function openRequestDetails(id){
     <div><b>Address</b><div>${esc2(val(r.address))}</div></div>
     <div><b>Principal / Head</b><div>${esc2(val(r.principal))}</div></div>
     <div><b>Education Level</b><div>${esc2(val(education))}</div></div>
-    <div><b>Subject</b><div>${esc2(val(r.subject))}</div></div>
-    <div><b>Grade</b><div>${esc2(val(r.grade))}</div></div>
-    <div><b>Book</b><div>${esc2(val(r.bookTitle))}</div></div>
-    <div><b>Quantity</b><div>${esc2(val(r.qty))}</div></div>
     <div><b>Preparing Date</b><div>${date(r.preparingDate)}</div></div>
     <div><b>Pickup Date</b><div>${date(r.pickupDate)}</div></div>
     <div><b>Release Date</b><div>${date(r.releaseDate)}</div></div>
    </div>
+   <h3 style="margin:20px 0 8px">Books Requested (${items.length})</h3>
+   <div class="table-wrap"><table style="width:100%;border-collapse:collapse">
+    <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">#</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Book Title</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Subject</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Grade</th><th style="text-align:right;padding:8px;border-bottom:2px solid #ddd">Qty</th></tr></thead>
+    <tbody>${items.map((i,n)=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${n+1}</td><td style="padding:8px;border-bottom:1px solid #eee"><b>${esc2(val(i.bookTitle))}</b></td><td style="padding:8px;border-bottom:1px solid #eee">${esc2(val(i.subject))}</td><td style="padding:8px;border-bottom:1px solid #eee">${esc2(val(i.grade))}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${Number(i.qty||0).toLocaleString()}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="4" style="padding:8px;text-align:right"><b>Total books</b></td><td style="padding:8px;text-align:right"><b>${items.reduce((s,i)=>s+Number(i.qty||0),0).toLocaleString()}</b></td></tr></tfoot>
+   </table></div>
    <div style="margin-top:16px;padding:16px;border-radius:10px;background:#f7f7f7">
     <b>Description / Purpose / Remarks</b>
     <div style="white-space:pre-wrap;margin-top:8px;line-height:1.5">${esc2(val(description))}</div>
@@ -892,7 +995,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       '<p>Send this link to anyone who wants to request books: <code id="reqLinkText">'+requestLink+'</code> <button type="button" id="copyReqLink">🔗 Copy link</button></p>';
     cards.after(links);
   }
-  window.copyRequestLink=async function(){try{await navigator.clipboard.writeText(requestLink);alert('Request link copied:\n'+requestLink)}catch(e){prompt('Copy this request link:',requestLink)}};
+  window.copyRequestLink=async function(){const msg='Request link copied! Paste it in your message to the requestor:\n\n'+requestLink;try{await navigator.clipboard.writeText(requestLink);alert(msg)}catch(e){try{const t=document.createElement('textarea');t.value=requestLink;document.body.appendChild(t);t.select();const ok=document.execCommand('copy');t.remove();if(ok){alert(msg);return}}catch(x){}prompt('Copy this request form link:',requestLink)}};
   document.addEventListener('click',e=>{if(e.target&&e.target.id==='copyReqLink')window.copyRequestLink()});
   function card(icon,title,text,cls,click,label){return '<div class="portal-card"><div class="portal-icon">'+icon+'</div><h3>'+title+'</h3><p>'+text+'</p><button class="'+cls+'" onclick="'+click+'">'+label+'</button></div>'}
 
