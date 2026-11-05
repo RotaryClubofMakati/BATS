@@ -111,6 +111,32 @@ th{background:#edf3fa;position:sticky;top:0;z-index:2}.num{text-align:right}
 .bats-spin{width:42px;height:42px;margin:0 auto 12px;border:4px solid #dbeafe;border-top-color:#2563eb;border-radius:50%;animation:batsSpin .8s linear infinite}
 @keyframes batsSpin{to{transform:rotate(360deg)}}
 </style>
+
+<style id="request-details-redesign">
+#requestDetailsModal.rd-modal{background:rgba(15,23,42,.55);backdrop-filter:blur(4px);padding:24px;align-items:flex-start;overflow-y:auto}
+#requestDetailsModal .rd-card{background:#fff!important;width:min(820px,100%);margin:auto;border-radius:18px;border-top:5px solid #f7a81b;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px 28px 20px;max-height:none;overflow:visible}
+#requestDetailsModal .rd-head{border-bottom:2px solid #f7a81b;padding-bottom:12px;margin-bottom:18px}
+#requestDetailsModal .rd-title{margin:0;font-size:26px;color:#173b72!important;font-family:Georgia,serif}
+#requestDetailsModal .rd-sub{font-size:13px;color:#64748b!important;margin-top:4px}
+#requestDetailsModal #requestDetailsBody{max-height:none!important;overflow:visible!important}
+#requestDetailsModal .rd-section{border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:12px;margin-bottom:16px;overflow:hidden}
+#requestDetailsModal .rd-section.green{border-left-color:#16a34a}
+#requestDetailsModal .rd-section.gold{border-left-color:#f7a81b}
+#requestDetailsModal .rd-sec-title{font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#173b72!important;padding:10px 16px;border-bottom:1px solid #e2e8f0;background:#f8fafc!important}
+#requestDetailsModal .rd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;padding:16px}
+#requestDetailsModal .rd-grid b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b!important;margin-bottom:3px}
+#requestDetailsModal .rd-grid div div{font-size:15px;color:#111827!important;overflow-wrap:anywhere;word-break:break-word}
+#requestDetailsModal .rd-book{padding:12px 16px;border-bottom:1px solid #eef2f7}
+#requestDetailsModal .rd-book-title{font-weight:700;font-size:15px;line-height:1.4;overflow-wrap:anywhere;white-space:normal}
+#requestDetailsModal .rd-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#requestDetailsModal .rd-tag{font-size:12px;padding:3px 10px;border-radius:999px;background:#eef5ff!important;color:#173b72!important;border:1px solid #bfdbfe}
+#requestDetailsModal .rd-tag.qty{background:#fff7e6!important;border-color:#fcd34d;color:#92400e!important;font-weight:700}
+#requestDetailsModal .rd-total{padding:12px 16px;text-align:right;font-weight:800;color:#173b72!important}
+#requestDetailsModal .rd-desc{padding:16px;white-space:pre-wrap;line-height:1.6;font-size:15px;overflow-wrap:anywhere}
+#requestDetailsModal .rd-foot{display:flex;justify-content:flex-end;margin-top:6px}
+#requestDetailsModal .rd-close{background:#f1f5f9;color:#111827;border:1px solid #e2e8f0;border-radius:10px;padding:9px 20px;font-weight:700;cursor:pointer}
+@media(max-width:640px){#requestDetailsModal .rd-grid{grid-template-columns:1fr}#requestDetailsModal .rd-card{padding:18px}}
+</style>
 </head>
 <body>
 <header>
@@ -900,13 +926,13 @@ window.addEventListener("load",()=>{document.getElementById('portalHome').style.
 
 // Initialize the multi-book request form.
 </script>
-<div id="requestDetailsModal" class="modal" aria-hidden="true">
- <div class="modal-card" style="max-width:900px">
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-   <div><h2 style="margin:0">Request Details</h2><div class="small">Requestor details and every book in this request</div></div>
-   <button type="button" class="gray" onclick="closeRequestDetails()">✕ Close</button>
+<div id="requestDetailsModal" class="modal rd-modal" aria-hidden="true" onclick="if(event.target===this)closeRequestDetails()">
+ <div class="rd-card">
+  <div class="rd-head">
+   <div><h2 class="rd-title">Request Details</h2><div class="rd-sub">Requestor details and every book in this request</div></div>
   </div>
-  <div id="requestDetailsBody" style="margin-top:18px;max-height:65vh;overflow:auto"></div>
+  <div id="requestDetailsBody"></div>
+  <div class="rd-foot"><button type="button" class="rd-close" onclick="closeRequestDetails()">Close</button></div>
  </div>
 </div>
 <script>
@@ -936,7 +962,7 @@ function openRequestDetails(id){
   const education=getField('educationLevel','level','education','Education Level');
 
   document.getElementById('requestDetailsBody').innerHTML=`
-   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+   <div class="rd-section"><div class="rd-sec-title">📋 Requestor Information</div><div class="rd-grid">
     <div><b>Request No.</b><div>${esc2(r.requestId)}</div></div>
     <div><b>Status</b><div>${esc2(r.status)}</div></div>
     <div><b>Request Date</b><div>${date(r.requestDate)}</div></div>
@@ -948,19 +974,18 @@ function openRequestDetails(id){
     <div><b>Address</b><div>${esc2(val(r.address))}</div></div>
     <div><b>Principal / Head</b><div>${esc2(val(r.principal))}</div></div>
     <div><b>Education Level</b><div>${esc2(val(education))}</div></div>
+   </div></div>
+   <div class="rd-section gold"><div class="rd-sec-title">📅 Dates</div><div class="rd-grid">
     <div><b>Preparing Date</b><div>${date(r.preparingDate)}</div></div>
     <div><b>Pickup Date</b><div>${date(r.pickupDate)}</div></div>
     <div><b>Release Date</b><div>${date(r.releaseDate)}</div></div>
+   </div></div>
+   <div class="rd-section green"><div class="rd-sec-title">📚 Books Requested (${items.length})</div>
+    ${items.map((i,n)=>`<div class="rd-book"><div class="rd-book-title">${n+1}. ${esc2(val(i.bookTitle))}</div><div class="rd-tags"><span class="rd-tag">${esc2(val(i.subject))}</span><span class="rd-tag">Grade ${esc2(val(i.grade))}</span><span class="rd-tag qty">Qty ${Number(i.qty||0).toLocaleString()}</span></div></div>`).join('')}
+    <div class="rd-total">Total books: ${items.reduce((s,i)=>s+Number(i.qty||0),0).toLocaleString()}</div>
    </div>
-   <h3 style="margin:20px 0 8px">Books Requested (${items.length})</h3>
-   <div class="table-wrap"><table style="width:100%;border-collapse:collapse">
-    <thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">#</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Book Title</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Subject</th><th style="text-align:left;padding:8px;border-bottom:2px solid #ddd">Grade</th><th style="text-align:right;padding:8px;border-bottom:2px solid #ddd">Qty</th></tr></thead>
-    <tbody>${items.map((i,n)=>`<tr><td style="padding:8px;border-bottom:1px solid #eee">${n+1}</td><td style="padding:8px;border-bottom:1px solid #eee"><b>${esc2(val(i.bookTitle))}</b></td><td style="padding:8px;border-bottom:1px solid #eee">${esc2(val(i.subject))}</td><td style="padding:8px;border-bottom:1px solid #eee">${esc2(val(i.grade))}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${Number(i.qty||0).toLocaleString()}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="4" style="padding:8px;text-align:right"><b>Total books</b></td><td style="padding:8px;text-align:right"><b>${items.reduce((s,i)=>s+Number(i.qty||0),0).toLocaleString()}</b></td></tr></tfoot>
-   </table></div>
-   <div style="margin-top:16px;padding:16px;border-radius:10px;background:#f7f7f7">
-    <b>Description / Purpose / Remarks</b>
-    <div style="white-space:pre-wrap;margin-top:8px;line-height:1.5">${esc2(val(description))}</div>
+   <div class="rd-section"><div class="rd-sec-title">📝 Description / Purpose / Remarks</div>
+    <div class="rd-desc">${esc2(val(description))}</div>
    </div>`;
   const m=document.getElementById('requestDetailsModal');m.classList.add('open');m.setAttribute('aria-hidden','false');
 }
