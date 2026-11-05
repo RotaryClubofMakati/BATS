@@ -234,6 +234,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
   <div id="inventoryTab" class="tab-panel active">
     <div class="toolbar">
       <button id="btnReceive" class="green" onclick="openReceive()">＋ Receive / Add Books</button>
+      <button id="btnReceivingReport" class="gray" onclick="openReceivingReportPrint()">🖨 Receiving Report</button>
       <button onclick="openRelease()">− Release Books</button>
       <button class="gray" onclick="openHistory()">Release History</button>
       <button class="gray" onclick="openMonthlyReleasePrint()">Monthly Release Print</button>
@@ -868,7 +869,7 @@ function releaseInfo(){
 async function receive(){
  const r={title:document.getElementById("rTitle").value.trim(),subject:document.getElementById("rSubject").value.trim(),grade:document.getElementById("rGrade").value.trim(),price:Number(document.getElementById("rPrice").value||0),qty:Number(document.getElementById("rQty").value||0),donor:document.getElementById("rDonor").value.trim(),reference:document.getElementById("rRef").value.trim(),remarks:document.getElementById("rRemarks").value.trim()};
  if(!r.title||!r.subject||!r.grade||r.qty<=0){alert("Book Title, Subject, Grade Level and Quantity are required.");return}
- try{await apiPost({action:"receive",record:r},true);closeM("receiveModal");await sync();alert("Stock received successfully. Quantity has been added to the master list.")}
+ try{const d=await apiPost({action:"receive",record:r},true);closeM("receiveModal");await sync();if(confirm("Stock received successfully. Quantity has been added to the master list.\n\nPrint the Receiving Report now?"))printReceivingReport([{...r,date:(d&&d.date)||new Date().toISOString().slice(0,10),receivedBy:(d&&d.receivedBy)||""}],{title:"Receiving Report"})}
  catch(e){alert("Could not save receiving transaction:\n"+e.message)}
 }
 async function releaseBook(){
@@ -1051,7 +1052,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   function applyRole(jump){
     const r=getRole();
     const allow={admin:['tabInventory','tabRequests','tabProgress','tabCompleted'],supervisor:['tabInventory','tabRequests','tabProgress','tabCompleted'],warehouse:['tabInventory','tabProgress','tabCompleted']}[r];
-    const rb=document.getElementById('btnReceive');if(rb)rb.style.display=(r==='warehouse')?'none':'';
+    const rb=document.getElementById('btnReceive');if(rb)rb.style.display='';
     ['tabInventory','tabRequests','tabProgress','tabCompleted'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display=allow.includes(id)?'':'none'});
     
     const st=document.getElementById('status');if(st&&adminAuthed())st.innerHTML='<span class="role-badge">'+ROLES[r]+'</span> session active';
@@ -1206,6 +1207,206 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       closeM('warehouseDateModal');setStatus('Request '+whId+' marked '+whStatus+' ('+date+').');
     }catch(e){setStatus('Could not save status',true);alert('Could not update request: '+e.message)}
     finally{btn.disabled=false}
+  };
+})();
+</script>
+<!-- ===== Final / Actual Release (warehouse confirms what was really handed over) ===== -->
+<div class="modal" id="finalReleaseModal"><div class="box" style="width:min(860px,100%)">
+  <h2 id="frTitle" style="margin-top:0">Final Release</h2>
+  <div id="frInfo" class="small"></div>
+  <div class="small" style="margin:6px 0 10px">Enter the <b>actual</b> books released. You can lower or raise the quantity, remove a book, or add another one. Stock is deducted from these actual quantities.</div>
+  <div class="table-wrap"><table><thead><tr><th>#</th><th>Book</th><th class="num">Requested</th><th class="num">Actual Qty</th><th></th></tr></thead><tbody id="frBooks"></tbody></table></div>
+  <button type="button" class="gray" style="margin-top:8px" onclick="frAddRow('',0,1)">＋ Add Another Book</button>
+  <div id="frTotal" style="margin:10px 0;font-weight:700"></div>
+  <div id="frWarn" style="color:#991b1b;font-weight:700;margin:6px 0"></div>
+  <div class="form">
+    <div><label id="frDateLbl">Date *</label><input id="frDate" type="date"></div>
+    <div class="full"><label>Remarks (reason for any change)</label><textarea id="frRemarks" rows="2" placeholder="e.g. requestor asked for fewer copies / extra books added"></textarea></div>
+  </div>
+  <div class="actions"><button class="gray" onclick="closeM('finalReleaseModal')">Cancel</button><button class="green" id="frSave" onclick="saveFinalRelease()">Confirm Final Release</button></div>
+</div></div>
+<script>
+(function(){
+  let frId='',frStatus='',frOrig={};
+  const optHtml=sel=>'<option value="">— Select book —</option>'+inventory.slice().sort((a,b)=>String(a.title).localeCompare(String(b.title))).map(b=>'<option value="'+esc(String(b.row))+'"'+(String(b.row)===String(sel)?' selected':'')+'>'+esc(b.title)+' — '+esc(b.subject)+' / Gr. '+esc(b.grade)+' (stock '+Number(b.qty||0)+')</option>').join('');
+  const stockOf=row=>{const b=inventory.find(z=>String(z.row)===String(row));return b?Number(b.qty||0):0};
+  function renumber(){document.querySelectorAll('#frBooks tr').forEach((tr,i)=>tr.querySelector('.frN').textContent=i+1);totals()}
+  function totals(){
+    let t=0,warn=[];
+    document.querySelectorAll('#frBooks tr').forEach(tr=>{
+      const row=tr.querySelector('.frBook').value,q=Number(tr.querySelector('.frQty').value||0);t+=q;
+      const was=frOrig[row]||0;tr.querySelector('.frReq').textContent=row?(was?was:'new'):'—';
+      if(row&&q>stockOf(row)){const b=inventory.find(z=>String(z.row)===String(row));warn.push((b?b.title:'Book')+' (actual '+q+', stock '+stockOf(row)+')')}
+    });
+    document.getElementById('frTotal').textContent='Total books to release: '+t.toLocaleString();
+    document.getElementById('frWarn').textContent=warn.length?'Not enough stock: '+warn.join('; '):'';
+    document.getElementById('frSave').disabled=!!warn.length;
+  }
+  window.frAddRow=function(row,req,qty){
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td class="frN"></td><td><select class="frBook" style="width:100%">'+optHtml(row)+'</select></td><td class="num frReq"></td><td class="num"><input class="frQty" type="number" min="1" value="'+(qty||1)+'" style="width:90px"></td><td><button type="button" class="red" onclick="this.closest(\'tr\').remove();frRenumber()">Remove</button></td>';
+    tr.querySelector('.frBook').onchange=totals;tr.querySelector('.frQty').oninput=totals;
+    document.getElementById('frBooks').appendChild(tr);renumber();
+  };
+  window.frRenumber=renumber;
+  const prevOpen=window.openWarehouseDate;
+  window.openWarehouseDate=function(id,status){
+    if(status!=='Picked Up'&&status!=='Delivered')return prevOpen(id,status);
+    if(!adminAuthed()){openAdminLogin();return}
+    const r=bookRequests.find(x=>String(x.requestId)===String(id));if(!r){alert('Request not found. Refresh the list.');return}
+    if(!inventory.length){alert('Inventory is still loading. Please try again in a moment.');return}
+    frId=String(id);frStatus=status;frOrig={};
+    document.getElementById('frTitle').textContent='Final Release – '+status;
+    document.getElementById('frDateLbl').textContent=(status==='Picked Up'?'Date picked up':'Date delivered')+' *';
+    document.getElementById('frInfo').innerHTML='<b>'+esc(r.requestId)+'</b> — '+esc(r.requestor)+' / '+esc(r.school||r.organization);
+    document.getElementById('frBooks').innerHTML='';
+    const items=r.items||[{bookRow:r.bookRow,bookTitle:r.bookTitle,qty:r.qty}];
+    items.forEach(i=>{frOrig[String(i.bookRow)]=(frOrig[String(i.bookRow)]||0)+Number(i.qty||0)});
+    items.forEach(i=>frAddRow(i.bookRow,i.qty,i.qty));
+    document.getElementById('frDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('frRemarks').value='';
+    totals();
+    document.getElementById('finalReleaseModal').classList.add('open');
+  };
+  window.warehouseMark=window.openWarehouseDate;
+  window.saveFinalRelease=async function(){
+    const rows=[...document.querySelectorAll('#frBooks tr')];
+    if(!rows.length){alert('Keep at least one book in the release.');return}
+    const date=document.getElementById('frDate').value;if(!date){alert('Please enter the date.');return}
+    const items=[],seen=new Set();
+    for(const tr of rows){
+      const row=tr.querySelector('.frBook').value,q=Number(tr.querySelector('.frQty').value||0);
+      if(!row||q<=0){alert('Select a book and an actual quantity of at least 1 for every row (or remove the row).');return}
+      if(seen.has(row)){alert('The same book is listed twice. Combine them into one row.');return}seen.add(row);
+      const b=inventory.find(z=>String(z.row)===String(row));
+      items.push({bookRow:row,bookTitle:b?b.title:'',qty:q});
+    }
+    const was=Object.values(frOrig).reduce((a,b)=>a+b,0),now=items.reduce((a,b)=>a+b.qty,0);
+    if(!confirm('Confirm final release of request '+frId+' as '+frStatus+'?\n\nRequested: '+was+' book(s)\nActual release: '+now+' book(s)\n\nStock will be deducted. This cannot be undone here.'))return;
+    const btn=document.getElementById('frSave');btn.disabled=true;
+    try{
+      setStatus('Saving final release...');
+      const d=await apiPost({action:'finalRelease',requestId:frId,status:frStatus,date:date,remarks:document.getElementById('frRemarks').value.trim(),records:items},true);
+      closeM('finalReleaseModal');
+      await sync();await loadBookRequests();renderProgress();
+      setStatus('Request '+frId+' marked '+frStatus+' ('+date+').');
+      const doneId=frId;
+      if(confirm('Request '+doneId+' marked '+frStatus+'.\nDelivery Receipt No.: '+((d&&d.releaseId)||'')+'\nBooks released: '+now+'\n\nPrint the Receiving Copy now?'))printReceivingCopy(doneId);
+    }catch(e){setStatus('Could not save final release',true);alert('Could not save the final release:\n'+e.message)}
+    finally{btn.disabled=false}
+  };
+})();
+</script>
+<!-- ===== Receiving Copy (printable acknowledgment of receipt, for documentation) ===== -->
+<script>
+(function(){
+  const FINISHED=['picked up','delivered','released','completed'];
+  const dateOf=r=>r.pickedUpDate||r.deliveredDate||r.releaseDate||r.updatedDate||'';
+  window.printReceivingCopy=function(id){
+    const r=bookRequests.find(x=>String(x.requestId)===String(id));
+    if(!r){alert('Request not found. Refresh the list.');return}
+    const items=(r.items&&r.items.length?r.items:[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}]);
+    const total=items.reduce((n,i)=>n+(Number(i.qty)||0),0);
+    const st=String(r.status||'').trim();
+    const how=/deliver/i.test(st)?'Delivered':/pick/i.test(st)?'Picked up':st;
+    const rel=String(r.handledBy||'').replace(/\s*\(.*$/,'');
+    const dt=requestDate(dateOf(r))||'';
+    const rows=items.map((i,n)=>'<tr><td class="c">'+(n+1)+'</td><td>'+esc(i.bookTitle)+'</td><td>'+esc(i.subject)+'</td><td class="c">'+esc(i.grade)+'</td><td class="c">'+esc(i.qty)+'</td></tr>').join('');
+    const orig=r.originalRequest?'<p class="note"><b>Originally requested:</b> '+esc(r.originalRequest)+(r.finalRemarks?'<br><b>Remarks:</b> '+esc(r.finalRemarks):'')+'</p>':(r.finalRemarks?'<p class="note"><b>Remarks:</b> '+esc(r.finalRemarks)+'</p>':'');
+    const info=(l,v)=>'<tr><td class="l">'+l+'</td><td>'+esc(v||'')+'</td></tr>';
+    const css='@page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0}'+
+      '.hd{text-align:center;border-bottom:2px solid #173b72;padding-bottom:10px;margin-bottom:14px}.hd .org{font-size:12px;letter-spacing:1px;color:#444}.hd h1{margin:4px 0 2px;font-size:20px;color:#173b72}.hd h2{margin:0;font-size:15px}'+
+      'table{width:100%;border-collapse:collapse}.info td{padding:4px 6px;vertical-align:top}.info td.l{width:24%;font-weight:bold;color:#333}.info{margin-bottom:14px}'+
+      '.books th,.books td{border:1px solid #444;padding:6px 8px}.books th{background:#eaeff7}.c{text-align:center}.tot td{font-weight:bold;background:#f5f5f5}'+
+      '.ack{margin:16px 0 8px;line-height:1.5}.note{background:#f8f8f8;border:1px solid #ddd;padding:8px;margin:10px 0}'+
+      '.sig{display:flex;gap:18px;margin-top:34px}.sig div{flex:1;text-align:center}.sig .ln{border-top:1px solid #000;margin-top:42px;padding-top:4px;font-weight:bold}.sig small{display:block;color:#555}'+
+      '.ft{margin-top:26px;font-size:11px;color:#666;text-align:center}';
+    const body='<div class="hd"><div class="org">ROTARY CLUB OF MAKATI • BOOKS ACROSS THE SEAS (BATS)</div><h1>RECEIVING COPY</h1><h2>Acknowledgment of Receipt of Books</h2></div>'+
+      '<table class="info">'+info('Request No.',r.requestId)+info('Delivery Receipt No.',r.releaseId)+info('Status',how)+info('Date '+(how||'released').toLowerCase(),dt)+
+      info('Recipient / Requestor',r.requestor)+info('Organization / School',[r.organization,r.school].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' / '))+
+      info('Address',r.address)+info('Contact / Mobile',r.mobile)+info('Purpose',r.purpose)+'</table>'+
+      '<table class="books"><thead><tr><th style="width:36px">#</th><th>Book Title</th><th>Subject</th><th style="width:70px">Grade</th><th style="width:70px">Qty</th></tr></thead><tbody>'+rows+
+      '<tr class="tot"><td colspan="4" style="text-align:right">TOTAL BOOKS</td><td class="c">'+total+'</td></tr></tbody></table>'+orig+
+      '<p class="ack">I hereby acknowledge that I have received the books listed above, complete and in good condition, and that they will be used for the purpose stated.</p>'+
+      '<div class="sig"><div><div class="ln">'+esc(rel)+'</div><small>Released by (Warehouse)</small></div><div><div class="ln">&nbsp;</div><small>Checked / Authorized by</small></div>'+
+      '<div><div class="ln">'+esc(r.requestor||'')+'</div><small>Received by (Signature over Printed Name)</small><small>Date: ____________ &nbsp; Contact: ____________</small></div></div>'+
+      '<div class="ft">Printed '+new Date().toLocaleString('en-PH')+' • BATS – Books Across the Seas</div>';
+    const w=window.open('','_blank','width=900,height=1000');
+    if(!w){alert('Please allow pop-ups for this site so the Receiving Copy can open.');return}
+    w.document.write('<html><head><title>Receiving Copy '+esc(r.requestId)+'</title><style>'+css+'</style></head><body>'+body+'<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>');
+    w.document.close();
+  };
+  const btn=id=>'<button type="button" onclick="printReceivingCopy(\''+String(id||'').replace(/['"\\]/g,'')+'\')">🖨 Receiving Copy</button>';
+
+  // In Progress list: show the print button once Picked Up / Delivered / Released
+  const prevActions=window.progressActions;
+  window.progressActions=function(r){
+    const a=prevActions(r);
+    return FINISHED.indexOf(String(r.status||'').trim().toLowerCase())>=0?a+btn(r.requestId):a;
+  };
+  // Completed list: add the print button next to each request
+  const prevCompleted=window.renderCompleted;
+  window.renderCompleted=function(){
+    prevCompleted.apply(this,arguments);
+    document.querySelectorAll('#completedBody tr').forEach(tr=>{
+      if(tr.querySelector('[onclick^="printReceivingCopy"]'))return;
+      const d=tr.querySelector('[data-request-id]');if(!d)return;
+      d.insertAdjacentHTML('beforebegin',btn(d.getAttribute('data-request-id')));
+    });
+  };
+  try{renderProgress();renderCompleted()}catch(e){}
+})();
+</script>
+<!-- ===== Receiving Report (stock received into the warehouse) – printable, for warehouse / admin / supervisor ===== -->
+<div class="modal" id="rcvPrintModal"><div class="box" style="width:min(460px,100%)">
+  <h2 style="margin-top:0">Print Receiving Report</h2>
+  <div class="small">Prints all books received into stock for the dates below (from the Received log).</div>
+  <div class="form" style="margin-top:12px"><div><label>From *</label><input id="rpFrom" type="date"></div><div><label>To *</label><input id="rpTo" type="date"></div></div>
+  <div class="actions"><button class="gray" onclick="closeM('rcvPrintModal')">Cancel</button><button class="green" id="rpGo" onclick="runReceivingReportPrint()">Print</button></div>
+</div></div>
+<script>
+(function(){
+  window.openReceivingReportPrint=function(){
+    if(!adminAuthed()){openAdminLogin();return}
+    const t=new Date(),iso=t.toISOString().slice(0,10);
+    document.getElementById('rpFrom').value=iso.slice(0,8)+'01';
+    document.getElementById('rpTo').value=iso;
+    document.getElementById('rcvPrintModal').classList.add('open');
+  };
+  window.runReceivingReportPrint=async function(){
+    const from=document.getElementById('rpFrom').value,to=document.getElementById('rpTo').value;
+    if(!from||!to){alert('Please select the From and To dates.');return}
+    if(to<from){alert('The To date cannot be earlier than the From date.');return}
+    const btn=document.getElementById('rpGo');btn.disabled=true;
+    try{
+      const d=await apiGet('received',true);
+      const rows=(d.received||[]).filter(x=>{const dt=String(x.date||'').slice(0,10);return dt>=from&&dt<=to}).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      if(!rows.length){alert('No received books found from '+from+' to '+to+'.');return}
+      closeM('rcvPrintModal');
+      printReceivingReport(rows,{title:'Receiving Report',from:from,to:to});
+    }catch(e){alert('Could not load the received log:\n'+e.message+'\n\nIf this says "Unknown action", deploy the latest Apps Script version.')}
+    finally{btn.disabled=false}
+  };
+  window.printReceivingReport=function(rows,opt){
+    opt=opt||{};
+    let qty=0,val=0;
+    const body=rows.map((x,n)=>{const q=Number(x.qty)||0,pr=Number(x.price)||0;qty+=q;val+=q*pr;
+      return '<tr><td class="c">'+(n+1)+'</td><td>'+esc(String(x.date||'').slice(0,10))+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.subject)+'</td><td class="c">'+esc(x.grade)+'</td><td class="c">'+q.toLocaleString()+'</td><td class="r">'+pr.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+esc(x.donor)+'</td><td>'+esc(x.reference)+'</td><td>'+esc(x.remarks)+'</td></tr>'}).join('');
+    const by=[...new Set(rows.map(x=>x.receivedBy).filter(Boolean))].join(', ');
+    const period=opt.from?(opt.from===opt.to?opt.from:opt.from+' to '+opt.to):String(rows[0].date||'').slice(0,10);
+    const css='@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:11.5px;color:#111;margin:0}'+
+      '.hd{text-align:center;border-bottom:2px solid #173b72;padding-bottom:8px;margin-bottom:10px}.hd .org{font-size:11px;letter-spacing:1px;color:#444}.hd h1{margin:3px 0 2px;font-size:19px;color:#173b72}.hd h2{margin:0;font-size:13px;font-weight:normal}'+
+      'table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:5px 6px;vertical-align:top}th{background:#eaeff7}.c{text-align:center}.r{text-align:right}.tot td{font-weight:bold;background:#f5f5f5}'+
+      '.sig{display:flex;gap:18px;margin-top:30px}.sig div{flex:1;text-align:center}.sig .ln{border-top:1px solid #000;margin-top:38px;padding-top:4px;font-weight:bold}.sig small{display:block;color:#555}.ft{margin-top:14px;font-size:10px;color:#666;text-align:center}';
+    const html='<div class="hd"><div class="org">ROTARY CLUB OF MAKATI • BOOKS ACROSS THE SEAS (BATS)</div><h1>'+esc(opt.title||'Receiving Report')+'</h1><h2>Books received into stock • '+esc(period)+'</h2></div>'+
+      '<table><thead><tr><th style="width:30px">#</th><th style="width:78px">Date</th><th>Book Title</th><th>Subject</th><th style="width:52px">Grade</th><th style="width:52px">Qty</th><th style="width:70px">Unit Price</th><th>Donor / Supplier</th><th>Reference No.</th><th>Remarks</th></tr></thead><tbody>'+body+
+      '<tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="c">'+qty.toLocaleString()+'</td><td colspan="4">Value: '+val.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr></tbody></table>'+
+      '<div class="sig"><div><div class="ln">'+esc(by)+'</div><small>Received by (Warehouse)</small></div><div><div class="ln">&nbsp;</div><small>Checked by</small></div><div><div class="ln">&nbsp;</div><small>Noted by (Supervisor / Admin)</small></div></div>'+
+      '<div class="ft">Printed '+new Date().toLocaleString('en-PH')+' • BATS – Books Across the Seas</div>';
+    const w=window.open('','_blank','width=1100,height=800');
+    if(!w){alert('Please allow pop-ups for this site so the Receiving Report can open.');return}
+    w.document.write('<html><head><title>Receiving Report</title><style>'+css+'</style></head><body>'+html+'<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>');
+    w.document.close();
   };
 })();
 </script>
