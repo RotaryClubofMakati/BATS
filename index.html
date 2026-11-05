@@ -210,7 +210,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
       <div><label>Name of Principal / Head</label><input id="qPrincipal"></div>
       <div><label>Contact Details of School / Library</label><input id="qSchoolContact"></div>
       <div><label>Number of Students *</label><input id="qStudents" type="number" min="0"></div>
-      <div><label>Education Level *</label><select id="qLevel"><option value="">Select level</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option></select></div>
+      <div><label>Education Level *</label><select id="qLevel"><option value="">Select level</option><option>Preschool / Kindergarten</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option><option>All Levels</option></select></div>
       <div class="full"><div id="publicBookItems" class="book-request-items"></div><button type="button" class="gray" onclick="addPublicBookItem()">＋ Add Another Book</button><div class="small" style="margin-top:8px">You can request multiple different books in one submission. Each selected book is saved as a separate request under the same requestor details.</div></div>
       <div class="full"><label>Purpose / Remarks</label><textarea id="qPurpose" rows="3" placeholder="Tell us how the books will be used."></textarea></div>
     </div>
@@ -322,7 +322,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
     </div>
   </div>
 </div>
-<div class="modal" id="processingSetupModal"><div class="box"><h2>Approve &amp; Send to Warehouse</h2><div class="small">Approving this request will move it directly to <strong>In Progress</strong>. Set the preparation date and, if already known, the pickup date.</div><div class="form" style="margin-top:14px"><div><label>Preparing / In Progress Date *</label><input id="processingDate" type="date"></div><div><label>Expected Pickup Date</label><input id="processingPickupDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('processingSetupModal')">Cancel</button><button class="green" onclick="confirmProcessingSetup()">Approve & Start Processing</button></div></div></div><div class="modal" id="completeRequestModal"><div class="box"><h2>Complete Request</h2><div class="small">Confirm the actual date the books were released/picked up. This will mark the request as <strong>Completed</strong>.</div><div class="form" style="margin-top:14px"><div><label>Release Date *</label><input id="completeReleaseDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('completeRequestModal')">Cancel</button><button class="green" onclick="confirmCompleteRequest()">Complete Request</button></div></div></div><div class="modal" id="manualRequestModal"><div class="box"><h2>Add Book Request</h2><div class="small">Add a book request manually. The system assigns a Request No. and tracks it with the other book requests.</div><div class="form" style="margin-top:12px"><div><label>Request Date</label><input id="mRequestDate" type="date"></div><div><label>Requested Pickup Date</label><input id="mPickupDate" type="date"></div><div><label>Requestor</label><input id="mRequestor"></div><div><label>Organization / Rotary Club</label><input id="mOrg"></div><div><label>Mobile / Contact</label><input id="mMobile"></div><div><label>Email (optional)</label><input id="mEmail"></div><div><label>School / Library</label><input id="mSchool"></div><div><label>Address</label><input id="mAddress" placeholder="Complete address"></div><div><label>Principal / Head</label><input id="mPrincipal"></div><div><label>Subject</label><select id="mSubject" onchange="populateManualBooks()"><option value="">Select subject</option></select></div><div><label>Grade Level</label><select id="mGrade" onchange="populateManualBooks()"><option value="">Select grade</option></select></div><div><label>Education Level *</label><select id="mLevel"><option value="">Select level</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option></select></div><div class="full"><label>Books Requested</label><div id="manualBookItems"></div><button type="button" class="gray" onclick="addManualBookItem()" style="margin-top:8px">＋ Add Another Book</button></div><div><label>Initial Status</label><select id="mStatus"><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option></select></div><div class="full"><label>Purpose / Remarks</label><textarea id="mPurpose" rows="3"></textarea></div></div><div class="actions"><button class="gray" onclick="closeM('manualRequestModal')">Cancel</button><button class="green" onclick="saveManualRequest()">Save Request</button></div></div></div></div>
+<div class="modal" id="processingSetupModal"><div class="box"><h2>Approve &amp; Send to Warehouse</h2><div class="small">Approving this request will move it directly to <strong>In Progress</strong>. Set the preparation date and, if already known, the pickup date.</div><div class="form" style="margin-top:14px"><div><label>Preparing / In Progress Date *</label><input id="processingDate" type="date"></div><div><label>Expected Pickup Date</label><input id="processingPickupDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('processingSetupModal')">Cancel</button><button class="green" onclick="confirmProcessingSetup()">Approve & Start Processing</button></div></div></div><div class="modal" id="completeRequestModal"><div class="box"><h2>Complete Request</h2><div class="small">Confirm the actual date the books were released/picked up. This will mark the request as <strong>Completed</strong>.</div><div class="form" style="margin-top:14px"><div><label>Release Date *</label><input id="completeReleaseDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('completeRequestModal')">Cancel</button><button class="green" onclick="confirmCompleteRequest()">Complete Request</button></div></div></div><div class="modal" id="manualRequestModal"><div class="box"><h2>Add Book Request</h2><div class="small">Add a book request manually. The system assigns a Request No. and tracks it with the other book requests.</div><div class="form" style="margin-top:12px"><div><label>Request Date</label><input id="mRequestDate" type="date"></div><div><label>Requested Pickup Date</label><input id="mPickupDate" type="date"></div><div><label>Requestor</label><input id="mRequestor"></div><div><label>Organization / Rotary Club</label><input id="mOrg"></div><div><label>Mobile / Contact</label><input id="mMobile"></div><div><label>Email (optional)</label><input id="mEmail"></div><div><label>School / Library</label><input id="mSchool"></div><div><label>Address</label><input id="mAddress" placeholder="Complete address"></div><div><label>Principal / Head</label><input id="mPrincipal"></div><div><label>Subject</label><select id="mSubject" onchange="populateManualBooks()"><option value="">Select subject</option></select></div><div><label>Grade Level</label><select id="mGrade" onchange="populateManualBooks()"><option value="">Select grade</option></select></div><div><label>Education Level *</label><select id="mLevel"><option value="">Select level</option><option>Preschool / Kindergarten</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option><option>All Levels</option></select></div><div class="full"><label>Books Requested</label><div id="manualBookItems"></div><button type="button" class="gray" onclick="addManualBookItem()" style="margin-top:8px">＋ Add Another Book</button></div><div><label>Initial Status</label><select id="mStatus"><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option></select></div><div class="full"><label>Purpose / Remarks</label><textarea id="mPurpose" rows="3"></textarea></div></div><div class="actions"><button class="gray" onclick="closeM('manualRequestModal')">Cancel</button><button class="green" onclick="saveManualRequest()">Save Request</button></div></div></div></div>
 
 <div class="modal" id="receiveModal"><div class="box">
 <h2>Receive / Add Books</h2>
@@ -1117,6 +1117,20 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
 .qty-big{font-size:18px;font-weight:800;color:#173b72}
 .date-line{font-size:11px;line-height:1.5;white-space:nowrap}.date-line b{color:#425466}
 </style>
+<style>
+#bookRequestsBody td{vertical-align:top}
+#bookRequestsBody .bk-count{font-weight:800;color:#173b72;margin-bottom:4px}
+#bookRequestsBody .bk-list{margin:0;padding:0 6px 0 20px;max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:12px;line-height:1.35}
+#bookRequestsBody .bk-list li{padding:5px 0;border-bottom:1px solid #e8edf3}
+#bookRequestsBody .bk-list li:last-child{border-bottom:0}
+#bookRequestsBody .bk-t{display:block;font-weight:700;overflow-wrap:anywhere}
+#bookRequestsBody .bk-m{display:block;color:#64748b;font-size:11px}
+#bookRequestsBody .lvl-badge{display:inline-block;background:#e0ecff;color:#173b72;border:1px solid #bcd0f5;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;margin-bottom:4px}
+#bookRequestsBody .lvl-badge.all{background:#fff4d6;color:#8a5a00;border-color:#f1d28a}
+#bookRequestsBody .lvl-tip{font-size:10px;color:#64748b;margin-bottom:4px}
+#bookRequestsBody td:nth-child(5){min-width:340px;max-width:460px}
+.req-summary .chips{max-height:110px;overflow-y:auto}
+</style>
 <div class="modal" id="warehouseDateModal"><div class="box" style="width:min(480px,100%)">
   <h2 id="whTitle" style="margin-top:0">Set Date</h2>
   <div id="whInfo" class="small"></div>
@@ -1128,6 +1142,13 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   const qtyOf=r=>Number(r.qty!==undefined&&r.qty!==''?r.qty:(r.quantity||r.Quantity||r.QTY||0))||0;
   const titleOf=r=>String(r.bookTitle||r.title||'').trim();
   const stockOf=r=>{const x=(inventory||[]).find(z=>String(z.row)===String(r.bookRow))||(inventory||[]).find(z=>key(z.title)===key(titleOf(r))&&key(z.grade)===key(r.grade));return x?Number(x.qty||0):null};
+  const itemsOf=r=>(r.items&&r.items.length)?r.items:[{bookRow:r.bookRow,bookTitle:titleOf(r),subject:r.subject,grade:r.grade,qty:qtyOf(r)}];
+  const stockOfItem=i=>{const x=(inventory||[]).find(z=>String(z.row)===String(i.bookRow))||(inventory||[]).find(z=>key(z.title)===key(i.bookTitle)&&key(z.grade)===key(i.grade));return x?Number(x.qty||0):null};
+  const levelOfGrade=g=>{g=String(g||'').trim().toUpperCase();if(!g)return null;if(/NURSERY|PRE|KINDER|^K$/.test(g))return 'Preschool';const n=parseInt(g,10);if(isNaN(n))return null;return n<=6?'Elementary':n<=10?'High School':n<=12?'Senior High':'College'};
+  const levelInfo=r=>{const order=['Preschool','Elementary','High School','Senior High','College'];const set=new Set(itemsOf(r).map(i=>levelOfGrade(i.grade)).filter(Boolean));const lv=order.filter(x=>set.has(x));
+    const given=String(r.level||r.educationLevel||'').trim();
+    if(lv.length>1)return {label:'All Levels',tip:lv.join(' + '),multi:true,given};
+    return {label:lv[0]||given||'—',tip:'',multi:false,given}};
   const DONE=['in progress','preparing','ready for pickup','released','completed','picked up','delivered'];
   window.filterRequestBook=function(t){const el=document.getElementById('requestSearch');el.value=t;renderBookRequests()};
 
@@ -1142,11 +1163,21 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       qtyDesc:(x,y)=>qtyOf(y)-qtyOf(x),school:(x,y)=>cmp(x.school,y.school)||d(y)-d(x),requestor:(x,y)=>cmp(x.requestor,y.requestor)||d(y)-d(x)};
     a.sort(sorts[so]||sorts.newest);
     // Summary: total quantity requested per book
-    const sum={};a.forEach(r=>{const t=titleOf(r)||'(no title)';const k2=t+' | Grade '+(r.grade||'-');sum[k2]=sum[k2]||{t:t,label:k2,q:0,n:0};sum[k2].q+=qtyOf(r);sum[k2].n++});
+    const sum={};a.forEach(r=>{itemsOf(r).forEach(i=>{const t=String(i.bookTitle||'').trim()||'(no title)';const k2=t+' | Grade '+(i.grade||'-');sum[k2]=sum[k2]||{t:t,label:k2,q:0,n:0};sum[k2].q+=Number(i.qty||0);sum[k2].n++})});
     const list=Object.values(sum).sort((x,y)=>y.q-x.q);
     const total=list.reduce((s,x)=>s+x.q,0);
     const box=document.getElementById('requestSummary');
     if(box)box.innerHTML=list.length?'<h3>Books requested: '+list.length+' title(s) • '+total.toLocaleString()+' book(s) in '+a.length+' request(s)</h3><div class="chips">'+list.map(x=>'<span class="chip" title="Show only this book" onclick="filterRequestBook('+esc(JSON.stringify(x.t))+')">'+esc(x.label)+' <small>('+x.n+' req)</small><b>'+x.q.toLocaleString()+'</b></span>').join('')+'</div>':'';
+    const bookCell=r=>{const it=itemsOf(r);if(it.length===1)return '<b>'+esc(it[0].bookTitle)+'</b>';
+      return '<div class="bk-count">'+it.length+' books</div><ol class="bk-list">'+it.map(i=>{const st=stockOfItem(i),short=st!==null&&st<Number(i.qty||0);return '<li><span class="bk-t">'+esc(i.bookTitle)+'</span><span class="bk-m">'+esc(i.subject)+' · Gr. '+esc(i.grade)+' · ×'+Number(i.qty||0).toLocaleString()+(short?' <b class="zero">(stock '+st.toLocaleString()+')</b>':'')+'</span></li>'}).join('')+'</ol>'};
+    const subjCell=r=>{const it=itemsOf(r),L=levelInfo(r);
+      const badge='<div class="lvl-badge'+(L.multi?' all':'')+'"'+(L.tip?' title="'+esc(L.tip)+'"':'')+'>🎓 '+esc(L.label)+'</div>'+(L.multi?'<div class="lvl-tip">'+esc(L.tip)+'</div>':'');
+      if(it.length===1)return badge+'<br>'+esc(it[0].subject)+'<br><small>Grade '+esc(it[0].grade)+'</small>';
+      const subs=[...new Set(it.map(i=>i.subject).filter(Boolean))],gr=[...new Set(it.map(i=>String(i.grade)).filter(Boolean))];
+      return badge+'<br><b>'+subs.length+' subject'+(subs.length>1?'s':'')+'</b><br><small>'+gr.length+' grade level'+(gr.length>1?'s':'')+'</small>'};
+    const stockCellFor=(r,single)=>{const it=itemsOf(r);if(it.length===1)return single;
+      const short=it.filter(i=>{const st=stockOfItem(i);return st===null||st<Number(i.qty||0)}).length;
+      return short?'<span class="zero">'+short+' of '+it.length+'</span><br><small class="zero">not enough</small>':'<span class="ok">All</span><br><small>in stock</small>'};
     body.innerHTML=a.map(r=>{
       const status=String(r.status||'Pending Approval').trim(),sk=status.toLowerCase(),id=esc(r.requestId);
       let actions='';
@@ -1155,7 +1186,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       actions+='<button type="button" class="red" data-request-action="delete" data-request-id="'+id+'">Delete</button>';
       const stock=stockOf(r),q2=qtyOf(r);
       const stockCell=stock===null?'<span class="small">—</span>':'<span class="'+(stock<q2?'zero':stock<=5?'low':'ok')+'">'+stock.toLocaleString()+'</span>'+(stock<q2?'<br><small class="zero">not enough</small>':'');
-      return '<tr><td><a href="#" data-request-details="'+id+'" style="font-weight:700;text-decoration:underline">'+id+'</a></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(r.requestor)+'<br><small>'+esc(r.organization)+'</small></td><td>'+esc(r.school)+'</td><td><b>'+esc(titleOf(r))+'</b></td><td>'+esc(r.subject)+'<br><small>Grade '+esc(r.grade)+'</small></td><td class="num"><span class="qty-big">'+q2.toLocaleString()+'</span></td><td class="num">'+stockCell+'</td><td><span class="status-pill '+requestStatusClass(status)+'">'+esc(status)+'</span></td><td><div class="request-actions">'+actions+'</div></td></tr>';
+      return '<tr><td><a href="#" data-request-details="'+id+'" style="font-weight:700;text-decoration:underline">'+id+'</a></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(r.requestor)+'<br><small>'+esc(r.organization)+'</small></td><td>'+esc(r.school)+'</td><td>'+bookCell(r)+'</td><td>'+subjCell(r)+'</td><td class="num"><span class="qty-big">'+q2.toLocaleString()+'</span></td><td class="num">'+stockCellFor(r,stockCell)+'</td><td><span class="status-pill '+requestStatusClass(status)+'">'+esc(status)+'</span></td><td><div class="request-actions">'+actions+'</div></td></tr>';
     }).join('')||'<tr><td colspan="10" class="request-empty">No requests found.</td></tr>';
   };
 
