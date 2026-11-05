@@ -200,7 +200,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
 
   <div id="inventoryTab" class="tab-panel active">
     <div class="toolbar">
-      <button class="green" onclick="openReceive()">＋ Receive / Add Books</button>
+      <button id="btnReceive" class="green" onclick="openReceive()">＋ Receive / Add Books</button>
       <button onclick="openRelease()">− Release Books</button>
       <button class="gray" onclick="openHistory()">Release History</button>
       <button class="gray" onclick="openMonthlyReleasePrint()">Monthly Release Print</button>
@@ -236,9 +236,10 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
       <div class="request-filters" style="margin-top:14px">
         <div><label>Search Requests</label><input id="requestSearch" placeholder="Request no., school, organization, book..." oninput="renderBookRequests()"></div>
         <div><label>Status</label><select id="requestStatusFilter" onchange="renderBookRequests()"><option value="">All Statuses</option><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Rejected</option><option>Ready for Pickup</option><option>Released</option><option>Picked Up</option><option>Delivered</option><option>Completed</option></select></div>
-        <div><label>Sort</label><select id="requestSort" onchange="renderBookRequests()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option></select></div>
+        <div><label>Sort</label><select id="requestSort" onchange="renderBookRequests()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="book">Book Title A–Z</option><option value="subject">Subject → Grade → Book</option><option value="grade">Grade → Subject → Book</option><option value="qtyDesc">Highest Quantity</option><option value="school">School / Library A–Z</option><option value="requestor">Requester A–Z</option></select></div>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>Request No.</th><th>Date</th><th>Requester / Organization</th><th>School / Library</th><th>Book</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead><tbody id="bookRequestsBody"><tr><td colspan="8" class="request-empty">Loading requests...</td></tr></tbody></table></div>
+      <div id="requestSummary" class="req-summary"></div>
+      <div class="table-wrap"><table><thead><tr><th>Request No.</th><th>Date</th><th>Requester / Organization</th><th>School / Library</th><th>Book Requested</th><th>Subject / Grade</th><th class="num">Qty Requested</th><th class="num">In Stock</th><th>Status</th><th>Actions</th></tr></thead><tbody id="bookRequestsBody"><tr><td colspan="8" class="request-empty">Loading requests...</td></tr></tbody></table></div>
     </div>
   </div>
 </div>
@@ -287,7 +288,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
     </div>
   </div>
 </div>
-<div class="modal" id="processingSetupModal"><div class="box"><h2>Approve & Start Processing</h2><div class="small">Approving this request will move it directly to <strong>In Progress</strong>. Set the preparation date and, if already known, the pickup date.</div><div class="form" style="margin-top:14px"><div><label>Preparing / In Progress Date *</label><input id="processingDate" type="date"></div><div><label>Expected Pickup Date</label><input id="processingPickupDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('processingSetupModal')">Cancel</button><button class="green" onclick="confirmProcessingSetup()">Approve & Start Processing</button></div></div></div><div class="modal" id="completeRequestModal"><div class="box"><h2>Complete Request</h2><div class="small">Confirm the actual date the books were released/picked up. This will mark the request as <strong>Completed</strong>.</div><div class="form" style="margin-top:14px"><div><label>Release Date *</label><input id="completeReleaseDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('completeRequestModal')">Cancel</button><button class="green" onclick="confirmCompleteRequest()">Complete Request</button></div></div></div><div class="modal" id="manualRequestModal"><div class="box"><h2>Add Book Request</h2><div class="small">Add a book request manually. The system assigns a Request No. and tracks it with the other book requests.</div><div class="form" style="margin-top:12px"><div><label>Request Date</label><input id="mRequestDate" type="date"></div><div><label>Requested Pickup Date</label><input id="mPickupDate" type="date"></div><div><label>Requestor</label><input id="mRequestor"></div><div><label>Organization / Rotary Club</label><input id="mOrg"></div><div><label>Mobile / Contact</label><input id="mMobile"></div><div><label>Email (optional)</label><input id="mEmail"></div><div><label>School / Library</label><input id="mSchool"></div><div><label>Address</label><input id="mAddress" placeholder="Complete address"></div><div><label>Principal / Head</label><input id="mPrincipal"></div><div><label>Subject</label><select id="mSubject" onchange="populateManualBooks()"><option value="">Select subject</option></select></div><div><label>Grade Level</label><select id="mGrade" onchange="populateManualBooks()"><option value="">Select grade</option></select></div><div><label>Education Level *</label><select id="mLevel"><option value="">Select level</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option></select></div><div class="full"><label>Books Requested</label><div id="manualBookItems"></div><button type="button" class="gray" onclick="addManualBookItem()" style="margin-top:8px">＋ Add Another Book</button></div><div><label>Initial Status</label><select id="mStatus"><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option></select></div><div class="full"><label>Purpose / Remarks</label><textarea id="mPurpose" rows="3"></textarea></div></div><div class="actions"><button class="gray" onclick="closeM('manualRequestModal')">Cancel</button><button class="green" onclick="saveManualRequest()">Save Request</button></div></div></div></div>
+<div class="modal" id="processingSetupModal"><div class="box"><h2>Approve &amp; Send to Warehouse</h2><div class="small">Approving this request will move it directly to <strong>In Progress</strong>. Set the preparation date and, if already known, the pickup date.</div><div class="form" style="margin-top:14px"><div><label>Preparing / In Progress Date *</label><input id="processingDate" type="date"></div><div><label>Expected Pickup Date</label><input id="processingPickupDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('processingSetupModal')">Cancel</button><button class="green" onclick="confirmProcessingSetup()">Approve & Start Processing</button></div></div></div><div class="modal" id="completeRequestModal"><div class="box"><h2>Complete Request</h2><div class="small">Confirm the actual date the books were released/picked up. This will mark the request as <strong>Completed</strong>.</div><div class="form" style="margin-top:14px"><div><label>Release Date *</label><input id="completeReleaseDate" type="date"></div></div><div class="actions"><button class="gray" onclick="closeM('completeRequestModal')">Cancel</button><button class="green" onclick="confirmCompleteRequest()">Complete Request</button></div></div></div><div class="modal" id="manualRequestModal"><div class="box"><h2>Add Book Request</h2><div class="small">Add a book request manually. The system assigns a Request No. and tracks it with the other book requests.</div><div class="form" style="margin-top:12px"><div><label>Request Date</label><input id="mRequestDate" type="date"></div><div><label>Requested Pickup Date</label><input id="mPickupDate" type="date"></div><div><label>Requestor</label><input id="mRequestor"></div><div><label>Organization / Rotary Club</label><input id="mOrg"></div><div><label>Mobile / Contact</label><input id="mMobile"></div><div><label>Email (optional)</label><input id="mEmail"></div><div><label>School / Library</label><input id="mSchool"></div><div><label>Address</label><input id="mAddress" placeholder="Complete address"></div><div><label>Principal / Head</label><input id="mPrincipal"></div><div><label>Subject</label><select id="mSubject" onchange="populateManualBooks()"><option value="">Select subject</option></select></div><div><label>Grade Level</label><select id="mGrade" onchange="populateManualBooks()"><option value="">Select grade</option></select></div><div><label>Education Level *</label><select id="mLevel"><option value="">Select level</option><option>Elementary</option><option>High School</option><option>Senior High School</option><option>College</option></select></div><div class="full"><label>Books Requested</label><div id="manualBookItems"></div><button type="button" class="gray" onclick="addManualBookItem()" style="margin-top:8px">＋ Add Another Book</button></div><div><label>Initial Status</label><select id="mStatus"><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option></select></div><div class="full"><label>Purpose / Remarks</label><textarea id="mPurpose" rows="3"></textarea></div></div><div class="actions"><button class="gray" onclick="closeM('manualRequestModal')">Cancel</button><button class="green" onclick="saveManualRequest()">Save Request</button></div></div></div></div>
 
 <div class="modal" id="receiveModal"><div class="box">
 <h2>Receive / Add Books</h2>
@@ -921,17 +922,18 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
 
   function applyRole(jump){
     const r=getRole();
-    const allow={admin:['tabInventory','tabRequests','tabProgress','tabCompleted'],supervisor:['tabRequests','tabProgress','tabCompleted'],warehouse:['tabProgress','tabCompleted']}[r];
+    const allow={admin:['tabInventory','tabRequests','tabProgress','tabCompleted'],supervisor:['tabInventory','tabRequests','tabProgress','tabCompleted'],warehouse:['tabInventory','tabProgress','tabCompleted']}[r];
+    const rb=document.getElementById('btnReceive');if(rb)rb.style.display=(r==='warehouse')?'none':'';
     ['tabInventory','tabRequests','tabProgress','tabCompleted'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display=allow.includes(id)?'':'none'});
     
     const st=document.getElementById('status');if(st&&adminAuthed())st.innerHTML='<span class="role-badge">'+ROLES[r]+'</span> session active';
-    if(jump&&r!=='admin'){const first=document.getElementById(allow[0]);showTab(first.getAttribute('onclick').match(/'(\w+)'/)[1],first)}
+    if(jump&&r==='warehouse'){const first=document.getElementById('tabProgress');showTab(first.getAttribute('onclick').match(/'(\w+)'/)[1],first)}
   }
   const origShowTab=window.showTab;
   window.showTab=function(id,btn){
     const r=getRole();
-    const allowed={admin:null,supervisor:['adminRequestTab','adminProgressTab','adminCompletedTab'],warehouse:['adminProgressTab','adminCompletedTab']}[r];
-    if(allowed&&adminAuthed()&&!allowed.includes(id)){id=allowed[0];btn=document.getElementById(id==='adminRequestTab'?'tabRequests':'tabProgress')}
+    const allowed={admin:null,supervisor:null,warehouse:['inventoryTab','adminProgressTab','adminCompletedTab']}[r];
+    if(allowed&&adminAuthed()&&!allowed.includes(id)){id='adminProgressTab';btn=document.getElementById('tabProgress')}
     return origShowTab(id,btn);
   };
 
@@ -940,22 +942,15 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   window.progressActions=function(r){
     const role=getRole(),id=JSON.stringify(r.requestId),k=String(r.status||'Pending Approval').toLowerCase();
     const prepared=['in progress','preparing','ready for pickup','released'].includes(k);
-    const wh='<button type="button" class="green" onclick="warehouseMark('+id+',\'Picked Up\')">✓ Picked Up</button><button type="button" onclick="warehouseMark('+id+',\'Delivered\')">🚚 Delivered</button>';
+    const wh='<button type="button" class="green" onclick="openWarehouseDate('+id+',\'Picked Up\')">✓ Picked Up</button><button type="button" onclick="openWarehouseDate('+id+',\'Delivered\')">🚚 Delivered</button>';
     const finished=(k==='picked up'||k==='delivered');
     if(role==='warehouse'){
-      if(k==='pending approval'||k==='approved')return '<small>Waiting for supervisor</small>';
+      if(k==='pending approval'||k==='approved')return '<small>Waiting for supervisor to send dates</small>';
       if(finished)return '<small>'+esc(r.status)+'</small>';
-      return (k==='in progress'?'<button type="button" class="gray" onclick="warehouseMark('+id+',\'Preparing\')">Preparing</button>':'')+'<button type="button" class="gray" onclick="warehouseMark('+id+',\'Ready for Pickup\')">Ready</button>'+wh;
+      const b=(st,lbl,cls)=>'<button type="button" class="'+cls+'" onclick="openWarehouseDate('+id+',\''+st+'\')">'+lbl+'</button>';
+      return b('Preparing','📦 Preparing','gray')+b('Ready for Pickup','For Pickup','gray')+b('Picked Up','✓ Picked Up','green')+b('Delivered','🚚 Delivered','');
     }
-    if(role==='supervisor'){
-      let a='';
-      if(k==='pending approval')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Approve + Set Dates</button><button type="button" class="gray" onclick="setRequestStatus('+id+',\'Rejected\')">Reject</button>';
-      else if(k==='approved')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Set Preparing / Pickup Date</button>';
-      else if(prepared)a+='<button type="button" onclick="openProcessingSetup('+id+')">Edit Dates</button>';
-      else if(finished)a+='<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>';
-      return a||'<small>'+esc(r.status||'')+'</small>';
-    }
-    // admin: everything + warehouse options
+    // admin + supervisor: everything + warehouse options
     return origActions(r)+(prepared?wh:'')+(finished?'<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>':'');
   };
 
@@ -982,5 +977,109 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
 })();
 </script>
 
+
+<!-- ===== Finalized: request list sorting, warehouse dates ===== -->
+<style>
+.req-summary{margin:4px 0 14px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;padding:12px}
+.req-summary h3{margin:0 0 8px;font-size:14px}
+.req-summary .chips{display:flex;flex-wrap:wrap;gap:8px}
+.req-summary .chip{background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer}
+.req-summary .chip b{color:#1d4ed8;font-size:14px;margin-left:6px}
+.qty-big{font-size:18px;font-weight:800;color:#173b72}
+.date-line{font-size:11px;line-height:1.5;white-space:nowrap}.date-line b{color:#425466}
+</style>
+<div class="modal" id="warehouseDateModal"><div class="box" style="width:min(480px,100%)">
+  <h2 id="whTitle" style="margin-top:0">Set Date</h2>
+  <div id="whInfo" class="small"></div>
+  <div style="margin-top:14px"><label id="whLabel">Date *</label><input id="whDate" type="date"></div>
+  <div class="actions"><button class="gray" onclick="closeM('warehouseDateModal')">Cancel</button><button class="green" id="whSave" onclick="saveWarehouseDate()">Save</button></div>
+</div></div>
+<script>
+(function(){
+  const qtyOf=r=>Number(r.qty!==undefined&&r.qty!==''?r.qty:(r.quantity||r.Quantity||r.QTY||0))||0;
+  const titleOf=r=>String(r.bookTitle||r.title||'').trim();
+  const stockOf=r=>{const x=(inventory||[]).find(z=>String(z.row)===String(r.bookRow))||(inventory||[]).find(z=>key(z.title)===key(titleOf(r))&&key(z.grade)===key(r.grade));return x?Number(x.qty||0):null};
+  const DONE=['in progress','preparing','ready for pickup','released','completed','picked up','delivered'];
+  window.filterRequestBook=function(t){const el=document.getElementById('requestSearch');el.value=t;renderBookRequests()};
+
+  window.renderBookRequests=function(){
+    const body=document.getElementById('bookRequestsBody');if(!body)return;
+    const q=key(document.getElementById('requestSearch')?.value||''),st=document.getElementById('requestStatusFilter')?.value||'',so=document.getElementById('requestSort')?.value||'newest';
+    let a=bookRequests.filter(r=>{const rs=key(r.status||'Pending Approval');return (st?String(r.status||'Pending Approval')===st:!DONE.includes(rs))&&(!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,titleOf(r),r.subject,r.grade,r.email].some(v=>key(v).includes(q)))});
+    const cmp=(x,y)=>String(x||'').localeCompare(String(y||''),undefined,{numeric:true,sensitivity:'base'});
+    const d=r=>new Date(r.requestDate||0).getTime();
+    const sorts={newest:(x,y)=>d(y)-d(x),oldest:(x,y)=>d(x)-d(y),book:(x,y)=>cmp(titleOf(x),titleOf(y))||cmp(x.grade,y.grade),
+      subject:(x,y)=>cmp(x.subject,y.subject)||cmp(x.grade,y.grade)||cmp(titleOf(x),titleOf(y)),grade:(x,y)=>cmp(x.grade,y.grade)||cmp(x.subject,y.subject)||cmp(titleOf(x),titleOf(y)),
+      qtyDesc:(x,y)=>qtyOf(y)-qtyOf(x),school:(x,y)=>cmp(x.school,y.school)||d(y)-d(x),requestor:(x,y)=>cmp(x.requestor,y.requestor)||d(y)-d(x)};
+    a.sort(sorts[so]||sorts.newest);
+    // Summary: total quantity requested per book
+    const sum={};a.forEach(r=>{const t=titleOf(r)||'(no title)';const k2=t+' | Grade '+(r.grade||'-');sum[k2]=sum[k2]||{t:t,label:k2,q:0,n:0};sum[k2].q+=qtyOf(r);sum[k2].n++});
+    const list=Object.values(sum).sort((x,y)=>y.q-x.q);
+    const total=list.reduce((s,x)=>s+x.q,0);
+    const box=document.getElementById('requestSummary');
+    if(box)box.innerHTML=list.length?'<h3>Books requested: '+list.length+' title(s) • '+total.toLocaleString()+' book(s) in '+a.length+' request(s)</h3><div class="chips">'+list.map(x=>'<span class="chip" title="Show only this book" onclick="filterRequestBook('+esc(JSON.stringify(x.t))+')">'+esc(x.label)+' <small>('+x.n+' req)</small><b>'+x.q.toLocaleString()+'</b></span>').join('')+'</div>':'';
+    body.innerHTML=a.map(r=>{
+      const status=String(r.status||'Pending Approval').trim(),sk=status.toLowerCase(),id=esc(r.requestId);
+      let actions='';
+      if(sk==='pending approval')actions+='<button type="button" class="green" data-request-action="approve" data-request-id="'+id+'">Approve + Set Dates</button><button type="button" class="gray" data-request-action="reject" data-request-id="'+id+'">Reject</button>';
+      if(sk==='approved')actions+='<button type="button" class="green" data-request-action="approve" data-request-id="'+id+'">Send to Warehouse</button>';
+      actions+='<button type="button" class="red" data-request-action="delete" data-request-id="'+id+'">Delete</button>';
+      const stock=stockOf(r),q2=qtyOf(r);
+      const stockCell=stock===null?'<span class="small">—</span>':'<span class="'+(stock<q2?'zero':stock<=5?'low':'ok')+'">'+stock.toLocaleString()+'</span>'+(stock<q2?'<br><small class="zero">not enough</small>':'');
+      return '<tr><td><a href="#" data-request-details="'+id+'" style="font-weight:700;text-decoration:underline">'+id+'</a></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+esc(r.requestor)+'<br><small>'+esc(r.organization)+'</small></td><td>'+esc(r.school)+'</td><td><b>'+esc(titleOf(r))+'</b></td><td>'+esc(r.subject)+'<br><small>Grade '+esc(r.grade)+'</small></td><td class="num"><span class="qty-big">'+q2.toLocaleString()+'</span></td><td class="num">'+stockCell+'</td><td><span class="status-pill '+requestStatusClass(status)+'">'+esc(status)+'</span></td><td><div class="request-actions">'+actions+'</div></td></tr>';
+    }).join('')||'<tr><td colspan="10" class="request-empty">No requests found.</td></tr>';
+  };
+
+  const line=(lbl,v)=>v?'<div class="date-line"><b>'+lbl+':</b> '+esc(requestDate(v))+'</div>':'';
+  window.renderProgress=function(){
+    const body=document.getElementById('progressBody');if(!body)return;bindProgressDeleteFallback();
+    const q=key(document.getElementById('progressSearch')?.value||''),st=document.getElementById('progressStatus')?.value||'',pd=document.getElementById('progressPickupFilter')?.value||'';
+    const counts={};bookRequests.forEach(r=>{const k=String(r.status||'Pending Approval').trim();counts[k]=(counts[k]||0)+1});
+    [['Pending Approval','progPending'],['In Progress','progInProgress'],['Preparing','progPreparing'],['Ready for Pickup','progReady'],['Released','progReleased'],['Completed','progCompleted']].forEach(x=>{const e=document.getElementById(x[1]);if(e)e.textContent=counts[x[0]]||0});
+    const wh=window.batsRole&&window.batsRole()==='warehouse';
+    let a=bookRequests.filter(r=>{const k=key(r.status||'Pending Approval');
+      if(k==='completed'||k==='rejected'&&!st)return false;
+      if(wh&&!st&&(k==='pending approval'||k==='approved'))return false;   // warehouse sees only requests sent by the supervisor
+      return (!st||String(r.status||'Pending Approval').trim()===st)&&(!pd||String(r.pickupDate||'')===pd)&&(!q||[r.requestId,r.requestor,r.organization,r.school,titleOf(r),r.subject,r.grade].some(v=>key(v).includes(q)))});
+    a.sort((x,y)=>String(x.preparingDate||'9999').localeCompare(String(y.preparingDate||'9999'))||new Date(y.updatedDate||0)-new Date(x.updatedDate||0));
+    body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td><b>'+esc(titleOf(r))+'</b><br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num"><span class="qty-big">'+qtyOf(r)+'</span></td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status||'Pending Approval')+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+(line('Planned',r.preparingDate)+line('Prepared',r.preparedDate)||'—')+'</td><td>'+(line('Planned',r.pickupDate)+line('For pickup',r.readyDate)||'—')+'</td><td>'+(line('Picked up',r.pickedUpDate)+line('Delivered',r.deliveredDate)+line('Released',r.releaseDate)||'—')+'</td><td>'+esc(requestDate(r.updatedDate))+'<br><small>'+esc(r.handledBy||'')+'</small></td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
+  };
+  // rename headers in the In Progress table
+  const ph=document.querySelector('#adminProgressTab thead tr');
+  if(ph)ph.innerHTML='<th>Request</th><th>Requester / School</th><th>Book</th><th class="num">Qty</th><th>Status</th><th>Request Date</th><th>Preparing</th><th>Pickup</th><th>Picked Up / Delivered</th><th>Last Update</th><th>Action</th>';
+
+  // Warehouse: every step needs a date
+  const FIELD={'Preparing':['preparedDate','Date prepared'],'Ready for Pickup':['readyDate','Date ready for pickup'],'Picked Up':['pickedUpDate','Date picked up'],'Delivered':['deliveredDate','Date delivered']};
+  let whId='',whStatus='';
+  window.openWarehouseDate=function(id,status){
+    if(!adminAuthed()){openAdminLogin();return}
+    const r=bookRequests.find(x=>String(x.requestId)===String(id));if(!r){alert('Request not found. Refresh the list.');return}
+    whId=String(id);whStatus=status;const f=FIELD[status];
+    document.getElementById('whTitle').textContent='Mark as '+status;
+    document.getElementById('whLabel').textContent=f[1]+' *';
+    document.getElementById('whInfo').innerHTML='<b>'+esc(r.requestId)+'</b> – '+esc(titleOf(r))+' × '+qtyOf(r)+'<br>Supervisor plan: preparing '+esc(requestDate(r.preparingDate)||'—')+', pickup '+esc(requestDate(r.pickupDate)||'—');
+    document.getElementById('whDate').value=r[f[0]]||new Date().toISOString().slice(0,10);
+    document.getElementById('warehouseDateModal').classList.add('open');
+  };
+  window.warehouseMark=window.openWarehouseDate;
+  window.saveWarehouseDate=async function(){
+    const date=document.getElementById('whDate').value;
+    if(!date){alert('Please enter the date.');return}
+    const r=bookRequests.find(x=>String(x.requestId)===whId)||{};
+    const f=FIELD[whStatus][0];
+    const payload={action:'updateBookRequest',requestId:whId,status:whStatus};
+    payload[f]=date;
+    if(whStatus==='Picked Up'||whStatus==='Delivered')payload.releaseDate=r.releaseDate||date;
+    const btn=document.getElementById('whSave');btn.disabled=true;
+    try{
+      setStatus('Saving: '+whStatus+'...');
+      await apiPost(payload,true);
+      await new Promise(x=>setTimeout(x,600));await loadBookRequests();renderProgress();
+      closeM('warehouseDateModal');setStatus('Request '+whId+' marked '+whStatus+' ('+date+').');
+    }catch(e){setStatus('Could not save status',true);alert('Could not update request: '+e.message)}
+    finally{btn.disabled=false}
+  };
+})();
+</script>
 </body>
 </html>
