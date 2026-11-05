@@ -539,11 +539,29 @@ function addPublicBookItem(prefill){
 }
 function populatePublicBookItem(el){
   const s=el.querySelector('.pb-subject').value,g=el.querySelector('.pb-grade'),b=el.querySelector('.pb-book');
-  const books=(window.publicBooksCache||[]).filter(x=>Number(x.qty)>0&&(!s||String(x.subject)===s)&&(!g.value||String(x.grade)===g.value));
-  b.innerHTML='<option value="">Select book</option>'+books.map(x=>'<option value="'+esc(String(x.row))+'">'+esc(x.title)+'</option>').join('');
+  const books=(window.publicBooksCache||[]).filter(x=>(!s||String(x.subject)===s)&&(!g.value||String(x.grade)===g.value)).sort((x,y)=>(Number(y.qty)>0)-(Number(x.qty)>0)||String(x.title||'').localeCompare(String(y.title||'')));
+  b.innerHTML='<option value="">Select book</option>'+books.map(x=>{const n=Number(x.qty||0);return n>0?'<option value="'+esc(String(x.row))+'">'+esc(x.title)+' — Available '+n.toLocaleString()+'</option>':'<option value="'+esc(String(x.row))+'" disabled>'+esc(x.title)+' — OUT OF STOCK</option>'}).join('');
   showPublicBookAvailability(el);
 }
-function showPublicBookAvailability(el){const b=el.querySelector('.pb-book'),note=el.querySelector('.book-available'),x=(window.publicBooksCache||[]).find(v=>String(v.row)===String(b.value));note.textContent=x?'Available: '+Number(x.qty).toLocaleString()+' book(s)':'';}
+function showPublicBookAvailability(el){
+  const b=el.querySelector('.pb-book'),note=el.querySelector('.book-available'),qi=el.querySelector('.pb-qty'),x=(window.publicBooksCache||[]).find(v=>String(v.row)===String(b.value));
+  const stock=x?Number(x.qty||0):null;
+  if(qi){
+    if(stock!==null&&stock>0)qi.max=stock;else qi.removeAttribute('max');
+    if(!qi.dataset.capBound){qi.dataset.capBound='1';qi.addEventListener('input',()=>enforcePublicQty(el));qi.addEventListener('blur',()=>enforcePublicQty(el));}
+  }
+  note.style.color='';
+  if(x&&stock<=0){note.textContent='OUT OF STOCK — this book cannot be requested.';note.style.color='#b91c1c';}
+  else note.textContent=x?'Available: '+stock.toLocaleString()+' book(s)':'';
+  if(qi)enforcePublicQty(el);
+}
+function enforcePublicQty(el){
+  const b=el.querySelector('.pb-book'),note=el.querySelector('.book-available'),qi=el.querySelector('.pb-qty'),x=(window.publicBooksCache||[]).find(v=>String(v.row)===String(b.value));
+  if(!x||!qi)return;
+  const stock=Number(x.qty||0),v=Number(qi.value||0);
+  if(stock<=0){qi.value='';return;}
+  if(v>stock){qi.value=stock;note.textContent='Only '+stock.toLocaleString()+' in stock — quantity set to the maximum available.';note.style.color='#b91c1c';}
+}
 function removePublicBookItem(n){const el=document.querySelector('.book-request-item[data-item="'+n+'"]');if(el)el.remove();renumberPublicBookItems();}
 function renumberPublicBookItems(){document.querySelectorAll('#publicBookItems .book-request-item').forEach((el,i)=>{el.querySelector('.book-request-item-head span').textContent='Book Request #'+(i+1);});}
 function initPublicBookItems(){const wrap=document.getElementById('publicBookItems');if(!wrap)return;wrap.innerHTML='';publicBookItemCount=0;addPublicBookItem();}
@@ -553,7 +571,7 @@ async function submitBookRequest(){
  if(!base.email||!base.organization||!base.requestor||!base.mobile||!base.address||!base.school||!base.students||!base.level){alert('Please complete all required requestor details first.');return}
  if(!items.length){alert('Add at least one book to your request.');return}
  const records=[];
- for(const el of items){const book=(window.publicBooksCache||[]).find(x=>String(x.row)===String(el.querySelector('.pb-book').value));const qty=Number(el.querySelector('.pb-qty').value||0);if(!book||qty<=0||qty>Number(book.qty||0)){alert('Please select an available book and valid quantity for every book request.');return}records.push({...base,subject:book.subject,grade:book.grade,bookRow:book.row,bookTitle:book.title,qty});}
+ for(const el of items){const book=(window.publicBooksCache||[]).find(x=>String(x.row)===String(el.querySelector('.pb-book').value));const qty=Number(el.querySelector('.pb-qty').value||0);if(!book){alert('Please select a book for every book request.');return}if(Number(book.qty||0)<=0){alert('"'+book.title+'" is OUT OF STOCK. Please remove it from your request.');return}if(qty<=0){alert('Please enter a quantity for "'+book.title+'".');return}if(qty>Number(book.qty||0)){alert('Only '+Number(book.qty).toLocaleString()+' of "'+book.title+'" are in stock. Please lower the quantity.');return}records.push({...base,subject:book.subject,grade:book.grade,bookRow:book.row,bookTitle:book.title,qty});}
  try{const d=await apiPost({action:'bookRequest',records:records},false);const id=d.requestId||'';const box=document.getElementById('requestSuccess');box.innerHTML='<strong>Request submitted successfully.</strong><br>Request No.: '+esc(id||'(see confirmation)')+'<br>'+records.length+' book(s) in this request:<ol style="margin:6px 0 6px 18px">'+records.map(r=>'<li>'+esc(r.bookTitle)+' — '+esc(r.subject)+' / Grade '+esc(r.grade)+' — <b>'+r.qty+'</b> pcs</li>').join('')+'</ol>Total: <b>'+records.reduce((s,r)=>s+r.qty,0)+'</b> pcs. Your request is now pending approval.';box.classList.add('show');}catch(e){alert('The request form could not be submitted.\n\n'+e.message);}
 }
 async function loadBookRequests(){if(!adminAuthed()){return}
@@ -581,7 +599,7 @@ async function loadBookRequests(){if(!adminAuthed()){return}
  }catch(e){body.innerHTML='<tr><td colspan="8" class="request-empty">Could not load requests: '+esc(e.message)+'</td></tr>';}
 }
 function requestStatusClass(st){const k=key(st);if(k==='pending approval')return 'status-pending';if(k==='approved')return 'status-approved';if(k==='preparing')return 'status-approved';if(k==='rejected')return 'status-rejected';if(k==='ready for pickup')return 'status-ready';if(k==='released')return 'status-released';if(k==='completed')return 'status-completed';return '';}
-function booksCell(r){const it=r.items||[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}];if(it.length===1)return esc(it[0].bookTitle)+'<br><small>'+esc(it[0].subject)+' / Grade '+esc(it[0].grade)+'</small>';return '<b>'+it.length+' books</b><ol style="margin:4px 0 0 16px;padding:0">'+it.map(i=>'<li>'+esc(i.bookTitle)+' <small>('+esc(i.subject)+' / Gr. '+esc(i.grade)+') × '+Number(i.qty||0)+'</small></li>').join('')+'</ol>';}
+function booksCell(r){const it=r.items||[{bookTitle:r.bookTitle,subject:r.subject,grade:r.grade,qty:r.qty}];if(it.length===1)return esc(it[0].bookTitle)+'<br><small>'+esc(it[0].subject)+' / Grade '+esc(it[0].grade)+'</small>';return window.bookListBtn(r);}
 function requestDate(v){if(!v)return '';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString('en-PH');}
 function renderBookRequests(){
  const body=document.getElementById('bookRequestsBody');if(!body)return;
@@ -1163,18 +1181,16 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       qtyDesc:(x,y)=>qtyOf(y)-qtyOf(x),school:(x,y)=>cmp(x.school,y.school)||d(y)-d(x),requestor:(x,y)=>cmp(x.requestor,y.requestor)||d(y)-d(x)};
     a.sort(sorts[so]||sorts.newest);
     // Summary: total quantity requested per book
-    const sum={};a.forEach(r=>{itemsOf(r).forEach(i=>{const t=String(i.bookTitle||'').trim()||'(no title)';const k2=t+' | Grade '+(i.grade||'-');sum[k2]=sum[k2]||{t:t,label:k2,q:0,n:0};sum[k2].q+=Number(i.qty||0);sum[k2].n++})});
+    const sum={};a.forEach(r=>{window.expandBookItems(itemsOf(r)).forEach(i=>{const t=String(i.bookTitle||'').trim()||'(no title)';const k2=t+' | Grade '+(i.grade||'-');sum[k2]=sum[k2]||{t:t,grade:'Grade '+(i.grade||'-'),label:k2,q:0,n:0,unk:false};if(i.qty===null||i.qty===undefined)sum[k2].unk=true;else sum[k2].q+=Number(i.qty||0);sum[k2].n++})});
     const list=Object.values(sum).sort((x,y)=>y.q-x.q);
-    const total=list.reduce((s,x)=>s+x.q,0);
+    const total=a.reduce((s2,r)=>s2+qtyOf(r),0);
     const box=document.getElementById('requestSummary');
-    if(box)box.innerHTML=list.length?'<h3>Books requested: '+list.length+' title(s) • '+total.toLocaleString()+' book(s) in '+a.length+' request(s)</h3><div class="chips">'+list.map(x=>'<span class="chip" title="Show only this book" onclick="filterRequestBook('+esc(JSON.stringify(x.t))+')">'+esc(x.label)+' <small>('+x.n+' req)</small><b>'+x.q.toLocaleString()+'</b></span>').join('')+'</div>':'';
-    const bookCell=r=>{const it=itemsOf(r);if(it.length===1)return '<b>'+esc(it[0].bookTitle)+'</b>';
-      return '<div class="bk-count">'+it.length+' books</div><ol class="bk-list">'+it.map(i=>{const st=stockOfItem(i),short=st!==null&&st<Number(i.qty||0);return '<li><span class="bk-t">'+esc(i.bookTitle)+'</span><span class="bk-m">'+esc(i.subject)+' · Gr. '+esc(i.grade)+' · ×'+Number(i.qty||0).toLocaleString()+(short?' <b class="zero">(stock '+st.toLocaleString()+')</b>':'')+'</span></li>'}).join('')+'</ol>'};
-    const subjCell=r=>{const it=itemsOf(r),L=levelInfo(r);
+    window.__reqSummary={titles:list.length,reqs:a.length,total:total,rows:list.map(x=>({t:x.t,grade:x.grade,n:x.n,q:x.unk?null:x.q}))};
+    if(box)box.innerHTML=list.length?'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h3 style="margin:0">Books requested: '+list.length+' title(s) • '+total.toLocaleString()+' book(s) in '+a.length+' request(s)</h3><button type="button" class="bl-btn" onclick="openBookSummary()">📚 View list</button></div>':'';
+    const bookCell=r=>window.bookListBtn(r);
+    const subjCell=r=>{const L=levelInfo(r);
       const badge='<div class="lvl-badge'+(L.multi?' all':'')+'"'+(L.tip?' title="'+esc(L.tip)+'"':'')+'>🎓 '+esc(L.label)+'</div>'+(L.multi?'<div class="lvl-tip">'+esc(L.tip)+'</div>':'');
-      if(it.length===1)return badge+'<br>'+esc(it[0].subject)+'<br><small>Grade '+esc(it[0].grade)+'</small>';
-      const subs=[...new Set(it.map(i=>i.subject).filter(Boolean))],gr=[...new Set(it.map(i=>String(i.grade)).filter(Boolean))];
-      return badge+'<br><b>'+subs.length+' subject'+(subs.length>1?'s':'')+'</b><br><small>'+gr.length+' grade level'+(gr.length>1?'s':'')+'</small>'};
+      return badge+'<br>'+window.subjectCellBtn(r)};
     const stockCellFor=(r,single)=>{const it=itemsOf(r);if(it.length===1)return single;
       const short=it.filter(i=>{const st=stockOfItem(i);return st===null||st<Number(i.qty||0)}).length;
       return short?'<span class="zero">'+short+' of '+it.length+'</span><br><small class="zero">not enough</small>':'<span class="ok">All</span><br><small>in stock</small>'};
@@ -1202,7 +1218,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       if(k==='pending approval'||k==='approved'||k==='rejected')return false;   // not yet approved: stays in Book Requests only
       return (!st||String(r.status||'Pending Approval').trim()===st)&&(!pd||String(r.pickupDate||'')===pd)&&(!q||[r.requestId,r.requestor,r.organization,r.school,titleOf(r),r.subject,r.grade].some(v=>key(v).includes(q)))});
     a.sort((x,y)=>String(x.preparingDate||'9999').localeCompare(String(y.preparingDate||'9999'))||new Date(y.updatedDate||0)-new Date(x.updatedDate||0));
-    body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td><b>'+esc(titleOf(r))+'</b><br><small>'+esc(r.subject)+' / Grade '+esc(r.grade)+'</small></td><td class="num"><span class="qty-big">'+qtyOf(r)+'</span></td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status||'Pending Approval')+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+(line('Planned',r.preparingDate)+line('Prepared',r.preparedDate)||'—')+'</td><td>'+(line('Planned',r.pickupDate)+line('For pickup',r.readyDate)||'—')+'</td><td>'+(line('Picked up',r.pickedUpDate)+line('Delivered',r.deliveredDate)+line('Released',r.releaseDate)||'—')+'</td><td>'+esc(requestDate(r.updatedDate))+'<br><small>'+esc(r.handledBy||'')+'</small></td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
+    body.innerHTML=a.map(r=>'<tr><td><button type="button" class="request-number-btn" data-request-details="'+esc(String(r.requestId||''))+'">'+esc(r.requestId)+'</button></td><td>'+esc(r.requestor)+'<br><small>'+esc(r.school||r.organization)+'</small></td><td>'+window.bookListBtn(r)+'</td><td class="num"><span class="qty-big">'+qtyOf(r)+'</span></td><td><span class="status-pill '+requestStatusClass(r.status)+'">'+esc(r.status||'Pending Approval')+'</span></td><td>'+esc(requestDate(r.requestDate))+'</td><td>'+(line('Planned',r.preparingDate)+line('Prepared',r.preparedDate)||'—')+'</td><td>'+(line('Planned',r.pickupDate)+line('For pickup',r.readyDate)||'—')+'</td><td>'+(line('Picked up',r.pickedUpDate)+line('Delivered',r.deliveredDate)+line('Released',r.releaseDate)||'—')+'</td><td>'+esc(requestDate(r.updatedDate))+'<br><small>'+esc(r.handledBy||'')+'</small></td><td><div class="progress-actions">'+progressActions(r)+'</div></td></tr>').join('')||'<tr><td colspan="11" class="request-empty">No requests found.</td></tr>';
   };
   // rename headers in the In Progress table
   const ph=document.querySelector('#adminProgressTab thead tr');
@@ -1539,6 +1555,129 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     const orig=(r.items||[]).map(i=>i.bookTitle+' ×'+i.qty).join('; '),now=full.map(i=>i.bookTitle+' ×'+i.qty).join('; ');
     printReceivingCopy(rcId,{items:full,status:type,date:date,original:orig!==now?orig:'',remarks:remarks});
   };
+})();
+</script>
+<style>
+.bl-btn{display:inline-flex;align-items:center;gap:6px;background:#eef5ff;color:#173b72;border:1px solid #bfdbfe;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.bl-btn:hover{background:#dbeafe}
+.bl-prev{display:block;margin-top:5px;font-size:12px;color:#475569;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bookListModal{z-index:100000!important;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);padding:24px;align-items:flex-start;overflow-y:auto}
+#bookListModal .bl-card{background:#fff;color:#111827;width:min(680px,100%);margin:auto;border-radius:18px;border-top:5px solid #f7a81b;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px 24px 18px}
+#bookListModal .bl-title{margin:0;font-size:22px;color:#173b72;font-family:Georgia,serif}
+#bookListModal .bl-sub{font-size:13px;color:#64748b;margin:4px 0 12px;padding-bottom:10px;border-bottom:2px solid #f7a81b}
+#bookListModal .bl-list{margin:0;padding:0;list-style:none;max-height:55vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:12px;counter-reset:bl}
+#bookListModal .bl-list li{counter-increment:bl;display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid #eef2f7;align-items:flex-start}
+#bookListModal .bl-list li:last-child{border-bottom:0}
+#bookListModal .bl-list li:before{content:counter(bl);flex:0 0 26px;height:26px;border-radius:50%;background:#173b72;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+#bookListModal .bl-t{font-weight:700;font-size:14.5px;line-height:1.35;overflow-wrap:anywhere}
+#bookListModal .bl-m{font-size:12px;color:#64748b;margin-top:2px}
+#bookListModal .bl-list li.bl-note:before{display:none}
+#bookListModal .bl-list li.bl-note{background:#f8fafc}
+#bookListModal .bl-chip{display:inline-block;background:#eef5ff;border:1px solid #bfdbfe;color:#173b72;border-radius:999px;padding:2px 9px;margin:3px 4px 0 0;font-size:12px;font-weight:700}
+#bookListModal .bl-q{margin-left:auto;flex:0 0 auto;background:#fff7e6;border:1px solid #fcd34d;color:#92400e;border-radius:999px;padding:3px 10px;font-weight:800;font-size:12.5px;white-space:nowrap}
+#bookListModal .bl-warn{color:#b91c1c;font-weight:700}
+#bookListModal .bl-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
+#bookListModal .bl-total{font-weight:800;color:#173b72}
+#bookListModal .bl-close{background:#f1f5f9;color:#111827;border:1px solid #e2e8f0;border-radius:10px;padding:9px 20px;font-weight:700;cursor:pointer}
+</style>
+<div id="bookListModal" class="modal" aria-hidden="true" onclick="if(event.target===this)closeBookList()">
+ <div class="bl-card" role="dialog" aria-modal="true" aria-labelledby="blTitle">
+  <h2 class="bl-title" id="blTitle">Books Requested</h2>
+  <div class="bl-sub" id="blSub"></div>
+  <ol class="bl-list" id="blList"></ol>
+  <div class="bl-foot"><div class="bl-total" id="blTotal"></div><button type="button" class="bl-close" onclick="closeBookList()">Close</button></div>
+ </div>
+</div>
+<script>
+(function(){
+  const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const K=v=>String(v??'').trim().toLowerCase();
+  // A sheet row may hold many titles joined by ", " (each title ends in a year). Split those apart.
+  function expand(list){
+    const out=[];
+    list.forEach(i=>{
+      const t=String(i.bookTitle||'').trim();
+      const parts=t.length>140?t.split(/(?<=\b(?:19|20)\d\d),\s+/).map(x=>x.trim()).filter(Boolean):[t];
+      if(parts.length>1)parts.forEach(x=>out.push({bookRow:i.bookRow,bookTitle:x,subject:i.subject,grade:i.grade,qty:null,split:true}));
+      else out.push(i);
+    });
+    return out;
+  }
+  window.expandBookItems=expand;
+  function items(r){
+    if(r.items&&r.items.length)return expand(r.items);
+    return expand([{bookRow:r.bookRow,bookTitle:String(r.bookTitle||r.title||''),subject:r.subject,grade:r.grade,qty:r.qty}]);
+  }
+  function stock(i){
+    const inv=(typeof inventory!=='undefined'&&inventory)||[];
+    const x=inv.find(z=>i.bookRow&&String(z.row)===String(i.bookRow))||inv.find(z=>K(z.title)===K(i.bookTitle)&&K(z.grade)===K(i.grade));
+    return x?Number(x.qty||0):null;
+  }
+  window.bookListBtn=function(r){
+    const it=items(r),id=E(String(r.requestId||'')),n=it.length;
+    const pcs=Number(r.totalQty||r.qty||0)||it.reduce((a,i)=>a+(Number(i.qty)||0),0);
+    if(n===1){
+      const i=it[0];
+      return '<b>'+E(i.bookTitle)+'</b><br><small>'+E(i.subject)+' / Grade '+E(i.grade)+'</small>';
+    }
+    return '<button type="button" class="bl-btn" onclick="openBookList(\''+id.replace(/'/g,"\\'")+'\')" title="View all books in this request">📚 '+n+' books · '+pcs.toLocaleString()+' pcs — View list</button><span class="bl-prev">'+E(it[0].bookTitle)+' +'+(n-1)+' more</span>';
+  };
+  function show(title,sub,rows,totalText){
+    document.getElementById('blTitle').textContent=title;
+    document.getElementById('blSub').textContent=sub;
+    document.getElementById('blList').innerHTML=rows.map(x=>'<li'+(x.cls?' class="'+x.cls+'"':'')+'><div><div class="bl-t">'+E(x.t)+'</div><div class="bl-m">'+x.m+'</div></div>'+(x.q===null?'':'<span class="bl-q">'+x.q+'</span>')+'</li>').join('');
+    document.getElementById('blTotal').textContent=totalText;
+    const m=document.getElementById('bookListModal');m.classList.add('open');m.setAttribute('aria-hidden','false');
+  }
+  window.openBookList=function(id){
+    const rid=String(id||'').trim();
+    const r=(typeof bookRequests!=='undefined'?bookRequests:[]).find(x=>String(x.requestId||'').trim()===rid);
+    if(!r)return;
+    const it=items(r);let total=0,short=0;
+    const rows=it.map(i=>{
+      const known=i.qty!==null&&i.qty!==undefined,q=Number(i.qty||0),st=stock(i);if(known)total+=q;
+      const bad=known&&st!==null&&st<q;if(bad)short++;
+      return {t:i.bookTitle,q:known?'× '+q.toLocaleString():null,m:E(i.subject)+' · Grade '+E(i.grade)+(bad?' · <span class="bl-warn">Low stock: '+st.toLocaleString()+' available</span>':'')};
+    });
+    const all=Number(r.totalQty||r.qty||0)||total;
+    show('Books Requested','Request '+rid+(r.requestor?' · '+r.requestor:'')+' · '+it.length+' book'+(it.length===1?'':'s'),rows,'Total: '+all.toLocaleString()+' pcs'+(short?' · '+short+' short on stock':''));
+  };
+  // ---- Subject / Grade popup (sorted so it is easy to scan) ----
+  const gRank=g=>{const t=K(g);if(t==='nursery')return 0;let m=t.match(/^pre-?\s*kinder\s*(\d)/);if(m)return +m[1];if(t==='kinder'||t==='kindergarten')return 3;m=t.match(/^(?:grade\s*)?(\d+)$/);if(m)return 10+ +m[1];return 100};
+  const gSort=(a,b)=>gRank(a)-gRank(b)||String(a).localeCompare(String(b),undefined,{numeric:true});
+  const splitList=v=>String(v??'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+  function subjData(r){
+    const raw=(r.items&&r.items.length)?r.items:[r];
+    const map=new Map(),allG=new Set();let joined=false;
+    raw.forEach(i=>{const ss=splitList(i.subject),gg=splitList(i.grade);if(ss.length>1||gg.length>1)joined=true;ss.forEach(x=>{if(!map.has(x))map.set(x,new Set());gg.forEach(g=>map.get(x).add(g))});gg.forEach(g=>allG.add(g))});
+    return {map,grades:[...allG].sort(gSort),joined};
+  }
+  window.subjectCellBtn=function(r){
+    const d=subjData(r),ns=d.map.size,ng=d.grades.length,id=E(String(r.requestId||''));
+    if(ns<=1&&ng<=1)return E([...d.map.keys()][0]||'—')+'<br><small>Grade '+E(d.grades[0]||'—')+'</small>';
+    return '<button type="button" class="bl-btn" onclick="openSubjectList(\''+id+'\')" title="View subjects and grade levels">📖 '+ns+' subject'+(ns===1?'':'s')+' · '+ng+' grade'+(ng===1?'':'s')+' — View</button>';
+  };
+  window.openSubjectList=function(id){
+    const rid=String(id||'').trim();
+    const r=(typeof bookRequests!=='undefined'?bookRequests:[]).find(x=>String(x.requestId||'').trim()===rid);
+    if(!r)return;
+    const d=subjData(r),subs=[...d.map.keys()].sort((a,b)=>a.localeCompare(b));
+    const chips=g=>g.map(x=>'<span class="bl-chip">'+E(x)+'</span>').join('');
+    let rows;
+    if(d.joined){
+      rows=[{t:'Grade levels ('+d.grades.length+')',m:chips(d.grades),cls:'bl-note',q:null}].concat(subs.map(x=>({t:x,m:'',q:null})));
+    }else{
+      rows=subs.map(x=>({t:x,m:chips([...d.map.get(x)].sort(gSort)),q:null}));
+    }
+    show('Subjects & Grade Levels','Request '+rid+' · '+subs.length+' subject'+(subs.length===1?'':'s')+' (A–Z) · '+d.grades.length+' grade level'+(d.grades.length===1?'':'s'),rows,d.joined?'Subjects listed A–Z; grade levels ordered Nursery → Grade 12':'Grades ordered Nursery → Grade 12');
+  };
+  // Summary of all visible requests (the "Books requested" box above the table)
+  window.openBookSummary=function(){
+    const S=window.__reqSummary;if(!S)return;
+    show('Books Requested — Summary',S.titles+' title(s) in '+S.reqs+' request(s)',S.rows.map(x=>({t:x.t,q:x.q===null?null:'× '+x.q.toLocaleString(),m:E(x.grade)+(x.n>1?' · '+x.n+' requests':'')})),'Total: '+S.total.toLocaleString()+' pcs');
+  };
+  window.closeBookList=function(){const m=document.getElementById('bookListModal');m.classList.remove('open');m.setAttribute('aria-hidden','true')};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')window.closeBookList()});
 })();
 </script>
 </body>
