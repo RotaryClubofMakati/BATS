@@ -235,7 +235,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
       </div>
       <div class="request-filters" style="margin-top:14px">
         <div><label>Search Requests</label><input id="requestSearch" placeholder="Request no., school, organization, book..." oninput="renderBookRequests()"></div>
-        <div><label>Status</label><select id="requestStatusFilter" onchange="renderBookRequests()"><option value="">All Statuses</option><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Rejected</option><option>Ready for Pickup</option><option>Released</option><option>Completed</option></select></div>
+        <div><label>Status</label><select id="requestStatusFilter" onchange="renderBookRequests()"><option value="">All Statuses</option><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Rejected</option><option>Ready for Pickup</option><option>Released</option><option>Picked Up</option><option>Delivered</option><option>Completed</option></select></div>
         <div><label>Sort</label><select id="requestSort" onchange="renderBookRequests()"><option value="newest">Newest First</option><option value="oldest">Oldest First</option></select></div>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Request No.</th><th>Date</th><th>Requester / Organization</th><th>School / Library</th><th>Book</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead><tbody id="bookRequestsBody"><tr><td colspan="8" class="request-empty">Loading requests...</td></tr></tbody></table></div>
@@ -244,7 +244,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
 </div>
 
 
-<div id="adminProgressTab" class="tab-panel"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin:0">Request In Progress</h2><div class="small">Track requests from approval through preparation, pickup, release and completion.</div></div><button class="gray" onclick="loadBookRequests();renderProgress()">↻ Refresh Status</button></div><div class="progress-summary"><div class="progress-card">Pending Approval<b id="progPending">0</b></div><div class="progress-card">In Progress<b id="progInProgress">0</b></div><div class="progress-card">Preparing<b id="progPreparing">0</b></div><div class="progress-card">Ready for Pickup<b id="progReady">0</b></div><div class="progress-card">Released<b id="progReleased">0</b></div><div class="progress-card">Completed<b id="progCompleted">0</b></div></div><div class="request-filters"><div><label>Search</label><input id="progressSearch" placeholder="Request, school, recipient, book..." oninput="renderProgress()"></div><div><label>Status</label><select id="progressStatus" onchange="renderProgress()"><option value="">All Statuses</option><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option><option>Released</option><option>Completed</option><option>Rejected</option></select></div><div><label>Pickup Date</label><input id="progressPickupFilter" type="date" onchange="renderProgress()"></div></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Requester / School</th><th>Book</th><th>Qty</th><th>Status</th><th>Request Date</th><th>Preparing Date</th><th>Pickup Date</th><th>Release Date</th><th>Last Update</th><th>Action</th></tr></thead><tbody id="progressBody"></tbody></table></div></div></div>
+<div id="adminProgressTab" class="tab-panel"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin:0">Request In Progress</h2><div class="small">Track requests from approval through preparation, pickup, release and completion.</div></div><button class="gray" onclick="loadBookRequests();renderProgress()">↻ Refresh Status</button></div><div class="progress-summary"><div class="progress-card">Pending Approval<b id="progPending">0</b></div><div class="progress-card">In Progress<b id="progInProgress">0</b></div><div class="progress-card">Preparing<b id="progPreparing">0</b></div><div class="progress-card">Ready for Pickup<b id="progReady">0</b></div><div class="progress-card">Released<b id="progReleased">0</b></div><div class="progress-card">Completed<b id="progCompleted">0</b></div></div><div class="request-filters"><div><label>Search</label><input id="progressSearch" placeholder="Request, school, recipient, book..." oninput="renderProgress()"></div><div><label>Status</label><select id="progressStatus" onchange="renderProgress()"><option value="">All Statuses</option><option>Pending Approval</option><option>Approved</option><option>In Progress</option><option>Preparing</option><option>Ready for Pickup</option><option>Released</option><option>Picked Up</option><option>Delivered</option><option>Completed</option><option>Rejected</option></select></div><div><label>Pickup Date</label><input id="progressPickupFilter" type="date" onchange="renderProgress()"></div></div><div class="table-wrap"><table><thead><tr><th>Request</th><th>Requester / School</th><th>Book</th><th>Qty</th><th>Status</th><th>Request Date</th><th>Preparing Date</th><th>Pickup Date</th><th>Release Date</th><th>Last Update</th><th>Action</th></tr></thead><tbody id="progressBody"></tbody></table></div></div></div>
 
 <div id="adminCompletedTab" class="tab-panel"><div class="card request-list">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -331,7 +331,7 @@ Launched in February 1988, the Books Across the Seas (BATS) program is a testame
 </div></div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyBpK2FAQ7D8Mes_JG6iBc8XKmrTB6lAzORofAOYiZoDBfTfnvNLabmtLWtLapUOMMK/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyhPOf-ESV3UlD6N_0fwvOlMCSrM_Zn68pxhFACmQuI2oLnObSErjIE7ErWPLxHn4Y4/exec";
 const ADMIN_ACTION_KEY = "BATS_ADMIN_ACTION_d3630d1686e831944b046dbb9e9e30d7";
 let adminToken = sessionStorage.getItem("batsAdminToken") || "";
 function adminAuthed(){ return !!adminToken; }
@@ -519,7 +519,7 @@ function requestDate(v){if(!v)return '';const d=new Date(v);return isNaN(d)?Stri
 function renderBookRequests(){
  const body=document.getElementById('bookRequestsBody');if(!body)return;
  const q=key(document.getElementById('requestSearch')?.value||''),st=document.getElementById('requestStatusFilter')?.value||'',so=document.getElementById('requestSort')?.value||'newest';
- let a=bookRequests.filter(r=>{const rs=String(r.status||'Pending Approval').trim().toLowerCase(); const inProgress=['in progress','preparing','ready for pickup','released','completed'].includes(rs); return !inProgress && (!st||String(r.status||'')===st) && (!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,r.bookTitle,r.subject,r.grade,r.email].some(v=>key(v).includes(q)));});
+ let a=bookRequests.filter(r=>{const rs=String(r.status||'Pending Approval').trim().toLowerCase(); const inProgress=['in progress','preparing','ready for pickup','released','completed','picked up','delivered'].includes(rs); return !inProgress && (!st||String(r.status||'')===st) && (!q||[r.requestId,r.requestDate,r.organization,r.requestor,r.school,r.bookTitle,r.subject,r.grade,r.email].some(v=>key(v).includes(q)));});
  a.sort((x,y)=>{const dx=new Date(x.requestDate||0).getTime(),dy=new Date(y.requestDate||0).getTime();return so==='oldest'?dx-dy:dy-dx});
  body.innerHTML=a.map(r=>{const status=String(r.status||'Pending Approval').trim();const statusKey=status.toLowerCase();const pending=statusKey==='pending approval';const approved=statusKey==='approved';const ready=statusKey==='ready for pickup';const released=statusKey==='released';
  let actions='';
@@ -789,7 +789,7 @@ function printReceipt(r){
 }
 
 function openAdminLogin(){document.getElementById('loginError').classList.remove('show');document.getElementById('adminUsername').value='';document.getElementById('adminPassword').value='';document.getElementById('adminLoginModal').classList.add('open');setTimeout(()=>document.getElementById('adminUsername').focus(),100)}
-async function adminLogin(){const username=document.getElementById('adminUsername').value.trim(),password=document.getElementById('adminPassword').value;const err=document.getElementById('loginError');if(!username||!password){err.textContent='Enter the admin username and password.';err.classList.add('show');return}try{const d=await apiPost({action:'adminLogin',username:username,password:password},false);adminToken=d.token||'';if(!adminToken)throw new Error('No admin session was returned.');sessionStorage.setItem('batsAdminToken',adminToken);closeM('adminLoginModal');document.getElementById('portalHome').style.display='none';document.getElementById('publicRequestTab').classList.remove('active');document.getElementById('adminPortal').style.display='block';document.getElementById('logoutBtn').style.display='inline-block';document.getElementById('status').textContent='Admin session active';showTab('inventoryTab',document.getElementById('tabInventory'));}catch(e){err.textContent='Login failed: '+e.message;err.classList.add('show')}}
+async function adminLogin(){const username=document.getElementById('adminUsername').value.trim(),password=document.getElementById('adminPassword').value;const err=document.getElementById('loginError');if(!username||!password){err.textContent='Enter the admin username and password.';err.classList.add('show');return}try{const d=await apiPost({action:'adminLogin',username:username,password:password,role:(document.getElementById('loginRole')||{}).value||'admin'},false);adminToken=d.token||'';if(!adminToken)throw new Error('No admin session was returned.');sessionStorage.setItem('batsAdminToken',adminToken);closeM('adminLoginModal');document.getElementById('portalHome').style.display='none';document.getElementById('publicRequestTab').classList.remove('active');document.getElementById('adminPortal').style.display='block';document.getElementById('logoutBtn').style.display='inline-block';document.getElementById('status').textContent='Admin session active';showTab('inventoryTab',document.getElementById('tabInventory'));}catch(e){err.textContent='Login failed: '+e.message;err.classList.add('show')}}
 function adminLogout(){adminToken='';sessionStorage.removeItem('batsAdminToken');bookRequests=[];inventory=[];releases=[];document.getElementById('adminPortal').style.display='none';document.getElementById('publicRequestTab').classList.remove('active');document.getElementById('portalHome').style.display='block';document.getElementById('logoutBtn').style.display='none';document.getElementById('status').textContent='Public Request Portal';}
 async function openPublicRequest(){
  document.getElementById('portalHome').style.display='none';
@@ -878,5 +878,122 @@ function openRequestDetails(id){
 function closeRequestDetails(){const m=document.getElementById('requestDetailsModal');m.classList.remove('open');m.setAttribute('aria-hidden','true')}
 document.addEventListener('click',function(e){const a=e.target.closest('[data-request-details]');if(!a)return;e.preventDefault();e.stopPropagation();openRequestDetails(a.getAttribute('data-request-details'));},true);
 </script>
+<!-- ===== Role workflow: Admin / Supervisor / Warehouse Staff ===== -->
+<style>
+.role-badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#eef5ff;color:#173b72;font-size:12px;font-weight:700;border:1px solid #bfdbfe}
+.portal-cards.roles4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.share-links{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;font-size:13px}
+.share-links code{background:#f1f5f9;padding:2px 6px;border-radius:6px;word-break:break-all}
+.flow-steps{display:flex;gap:6px;flex-wrap:wrap;font-size:12px;margin-top:8px}.flow-steps span{background:#f1f5f9;border-radius:999px;padding:3px 9px}
+</style>
+<script>
+(function(){
+  const ROLES={admin:'Admin',supervisor:'Supervisor',warehouse:'Warehouse Staff'};
+  const base=location.origin+'/';
+  let userRole=sessionStorage.getItem('batsRole')||'';
+  const getRole=()=>userRole||'admin';
+  window.batsRole=getRole;
+
+  // Login modal: add role selector
+  const userInput=document.getElementById('adminUsername');
+  if(userInput){
+    const wrap=document.createElement('div');wrap.className='full';
+    wrap.innerHTML='<label>Login as</label><select id="loginRole"><option value="admin">Admin</option><option value="supervisor">Supervisor</option><option value="warehouse">Warehouse Staff</option></select>';
+    userInput.parentElement.parentElement.insertBefore(wrap,userInput.parentElement);
+  }
+
+  // Portal cards for each role + shareable links
+  const cards=document.querySelector('#portalHome .portal-cards');
+  if(cards){
+    cards.innerHTML=
+      card('📝','Request a Book','Requestors open the request link, browse the listed books and submit a request.','green','openPublicRequest()','Request a Book')+
+      card('🔐','Admin','Full access: inventory, requests, receiving, releasing and monthly reports.','','openRoleLogin(\'admin\')','Admin Login')+
+      card('🧑‍💼','Supervisor','Approve requests and encode the preparing date and pickup date.','','openRoleLogin(\'supervisor\')','Supervisor Login')+
+      card('🏭','Warehouse Staff','See approved requests and mark them as Picked Up or Delivered.','','openRoleLogin(\'warehouse\')','Warehouse Login');
+    const links=document.createElement('div');links.className='share-links';
+    links.innerHTML='<strong>Shareable links</strong><div class="flow-steps"><span>1. Requestor</span><span>→ 2. Admin / Supervisor approves + sets dates</span><span>→ 3. Warehouse: Picked Up / Delivered</span></div>'+
+      '<p>Request form (book list): <code>'+base+'?view=request</code></p>'+
+      '<p>Supervisor: <code>'+base+'?role=supervisor</code> &nbsp; Warehouse: <code>'+base+'?role=warehouse</code> &nbsp; Admin: <code>'+base+'?role=admin</code></p>';
+    cards.after(links);
+  }
+  function card(icon,title,text,cls,click,label){return '<div class="portal-card"><div class="portal-icon">'+icon+'</div><h3>'+title+'</h3><p>'+text+'</p><button class="'+cls+'" onclick="'+click+'">'+label+'</button></div>'}
+
+  window.openRoleLogin=function(role){openAdminLogin();const s=document.getElementById('loginRole');if(s)s.value=role||'admin';const h=document.querySelector('#adminLoginModal h2');if(h)h.textContent=(ROLES[role]||'Admin')+' Login'};
+
+  // Wrap login to capture role and limit tabs
+  const origLogin=window.adminLogin;
+  window.adminLogin=async function(){
+    const chosen=(document.getElementById('loginRole')||{}).value||'admin';
+    await origLogin();
+    if(adminAuthed()){userRole=chosen;sessionStorage.setItem('batsRole',chosen);applyRole(true)}
+  };
+  const origLogout=window.adminLogout;
+  window.adminLogout=function(){userRole='';sessionStorage.removeItem('batsRole');origLogout();document.querySelectorAll('.tabbtn').forEach(b=>b.style.display='')};
+
+  function applyRole(jump){
+    const r=getRole();
+    const allow={admin:['tabInventory','tabRequests','tabProgress','tabCompleted'],supervisor:['tabRequests','tabProgress','tabCompleted'],warehouse:['tabProgress','tabCompleted']}[r];
+    ['tabInventory','tabRequests','tabProgress','tabCompleted'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display=allow.includes(id)?'':'none'});
+    const lb=document.getElementById('logoutBtn');if(lb)lb.textContent='Logout '+ROLES[r];
+    const st=document.getElementById('status');if(st&&adminAuthed())st.innerHTML='<span class="role-badge">'+ROLES[r]+'</span> session active';
+    if(jump&&r!=='admin'){const first=document.getElementById(allow[0]);showTab(first.getAttribute('onclick').match(/'(\w+)'/)[1],first)}
+  }
+  const origShowTab=window.showTab;
+  window.showTab=function(id,btn){
+    const r=getRole();
+    const allowed={admin:null,supervisor:['adminRequestTab','adminProgressTab','adminCompletedTab'],warehouse:['adminProgressTab','adminCompletedTab']}[r];
+    if(allowed&&adminAuthed()&&!allowed.includes(id)){id=allowed[0];btn=document.getElementById(id==='adminRequestTab'?'tabRequests':'tabProgress')}
+    return origShowTab(id,btn);
+  };
+
+  // Role-based actions in the In Progress list
+  const origActions=window.progressActions;
+  window.progressActions=function(r){
+    const role=getRole(),id=JSON.stringify(r.requestId),k=String(r.status||'Pending Approval').toLowerCase();
+    const prepared=['in progress','preparing','ready for pickup','released'].includes(k);
+    const wh='<button type="button" class="green" onclick="warehouseMark('+id+',\'Picked Up\')">✓ Picked Up</button><button type="button" onclick="warehouseMark('+id+',\'Delivered\')">🚚 Delivered</button>';
+    const finished=(k==='picked up'||k==='delivered');
+    if(role==='warehouse'){
+      if(k==='pending approval'||k==='approved')return '<small>Waiting for supervisor</small>';
+      if(finished)return '<small>'+esc(r.status)+'</small>';
+      return (k==='in progress'?'<button type="button" class="gray" onclick="warehouseMark('+id+',\'Preparing\')">Preparing</button>':'')+'<button type="button" class="gray" onclick="warehouseMark('+id+',\'Ready for Pickup\')">Ready</button>'+wh;
+    }
+    if(role==='supervisor'){
+      let a='';
+      if(k==='pending approval')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Approve + Set Dates</button><button type="button" class="gray" onclick="setRequestStatus('+id+',\'Rejected\')">Reject</button>';
+      else if(k==='approved')a+='<button type="button" class="green" onclick="openProcessingSetup('+id+')">Set Preparing / Pickup Date</button>';
+      else if(prepared)a+='<button type="button" onclick="openProcessingSetup('+id+')">Edit Dates</button>';
+      else if(finished)a+='<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>';
+      return a||'<small>'+esc(r.status||'')+'</small>';
+    }
+    // admin: everything + warehouse options
+    return origActions(r)+(prepared?wh:'')+(finished?'<button type="button" class="green" data-request-action="complete" data-request-id="'+esc(String(r.requestId||''))+'">✓ Complete</button>':'');
+  };
+
+  window.warehouseMark=async function(id,status){
+    if(!adminAuthed()){openAdminLogin();return}
+    const r=bookRequests.find(x=>String(x.requestId)===String(id));if(!r){alert('Request not found. Refresh the list.');return}
+    if((status==='Picked Up'||status==='Delivered')&&!confirm('Mark request '+id+' as '+status+'?'))return;
+    const today=new Date().toISOString().slice(0,10);
+    try{
+      setStatus('Saving: '+status+'...');
+      const payload={action:'updateBookRequest',requestId:id,status:status,preparingDate:r.preparingDate||'',pickupDate:r.pickupDate||''};
+      if(status==='Picked Up'||status==='Delivered')payload.releaseDate=today;
+      await apiPost(payload,true);
+      await new Promise(x=>setTimeout(x,600));await loadBookRequests();renderProgress();
+      setStatus('Request '+id+' marked '+status+'.');
+    }catch(e){setStatus('Could not save status',true);alert('Could not update request: '+e.message)}
+  };
+
+  // Restore session role + deep links
+  if(adminAuthed()&&userRole)setTimeout(()=>applyRole(false),300);
+  const q=new URLSearchParams(location.search);
+  setTimeout(()=>{
+    if(q.get('view')==='request')openPublicRequest();
+    else if(q.get('role')&&!adminAuthed())openRoleLogin(q.get('role'));
+  },400);
+})();
+</script>
+
 </body>
 </html>
