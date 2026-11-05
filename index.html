@@ -1574,10 +1574,16 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
 #bookListModal .bl-list li.bl-note:before{display:none}
 #bookListModal .bl-list li.bl-note{background:#f8fafc}
 #bookListModal .bl-chip{display:inline-block;background:#eef5ff;border:1px solid #bfdbfe;color:#173b72;border-radius:999px;padding:2px 9px;margin:3px 4px 0 0;font-size:12px;font-weight:700}
+#bookListModal .bl-chk{flex:0 0 auto;width:22px;height:22px;margin-top:2px;accent-color:#16a34a;cursor:pointer}
+#bookListModal .bl-list li.bl-picked{background:#f0fdf4}
+#bookListModal .bl-list li.bl-picked .bl-t{text-decoration:line-through;color:#6b7280}
+#bookListModal .bl-prog{font-weight:700;color:#166534;font-size:13px}
 #bookListModal .bl-q{margin-left:auto;flex:0 0 auto;background:#fff7e6;border:1px solid #fcd34d;color:#92400e;border-radius:999px;padding:3px 10px;font-weight:800;font-size:12.5px;white-space:nowrap}
 #bookListModal .bl-warn{color:#b91c1c;font-weight:700}
 #bookListModal .bl-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
 #bookListModal .bl-total{font-weight:800;color:#173b72}
+#bookListModal .bl-print{background:#173b72;color:#fff;border:1px solid #173b72;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+#bookListModal .bl-print:hover{background:#0f2c58}
 #bookListModal .bl-close{background:#f1f5f9;color:#111827;border:1px solid #e2e8f0;border-radius:10px;padding:9px 20px;font-weight:700;cursor:pointer}
 </style>
 <div id="bookListModal" class="modal" aria-hidden="true" onclick="if(event.target===this)closeBookList()">
@@ -1585,7 +1591,7 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   <h2 class="bl-title" id="blTitle">Books Requested</h2>
   <div class="bl-sub" id="blSub"></div>
   <ol class="bl-list" id="blList"></ol>
-  <div class="bl-foot"><div class="bl-total" id="blTotal"></div><button type="button" class="bl-close" onclick="closeBookList()">Close</button></div>
+  <div class="bl-foot"><div class="bl-total" id="blTotal"></div><div style="display:flex;gap:8px"><button type="button" class="bl-print" id="blPrint" onclick="printBookList()">🖨 Print pick list</button><button type="button" class="bl-close" onclick="closeBookList()">Close</button></div></div>
  </div>
 </div>
 <script>
@@ -1622,10 +1628,11 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     }
     return '<button type="button" class="bl-btn" onclick="openBookList(\''+id.replace(/'/g,"\\'")+'\')" title="View all books in this request">📚 '+n+' books · '+pcs.toLocaleString()+' pcs — View list</button><span class="bl-prev">'+E(it[0].bookTitle)+' +'+(n-1)+' more</span>';
   };
-  function show(title,sub,rows,totalText){
+  function show(title,sub,rows,totalText,pd){
+    window.__blPrint=pd||null;const pb=document.getElementById('blPrint');if(pb)pb.style.display=pd?'':'none';
     document.getElementById('blTitle').textContent=title;
     document.getElementById('blSub').textContent=sub;
-    document.getElementById('blList').innerHTML=rows.map(x=>'<li'+(x.cls?' class="'+x.cls+'"':'')+'><div><div class="bl-t">'+E(x.t)+'</div><div class="bl-m">'+x.m+'</div></div>'+(x.q===null?'':'<span class="bl-q">'+x.q+'</span>')+'</li>').join('');
+    document.getElementById('blList').innerHTML=rows.map((x,n)=>'<li'+(x.cls?' class="'+x.cls+'"':'')+'>'+'<div><div class="bl-t">'+E(x.t)+'</div><div class="bl-m">'+x.m+'</div></div>'+(x.q===null?'':'<span class="bl-q">'+x.q+'</span>')+'</li>').join('');
     document.getElementById('blTotal').textContent=totalText;
     const m=document.getElementById('bookListModal');m.classList.add('open');m.setAttribute('aria-hidden','false');
   }
@@ -1634,13 +1641,15 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
     const r=(typeof bookRequests!=='undefined'?bookRequests:[]).find(x=>String(x.requestId||'').trim()===rid);
     if(!r)return;
     const it=items(r);let total=0,short=0;
-    const rows=it.map(i=>{
+    const rows=it.map((i,idx)=>{
       const known=i.qty!==null&&i.qty!==undefined,q=Number(i.qty||0),st=stock(i);if(known)total+=q;
       const bad=known&&st!==null&&st<q;if(bad)short++;
       return {t:i.bookTitle,q:known?'× '+q.toLocaleString():null,m:E(i.subject)+' · Grade '+E(i.grade)+(bad?' · <span class="bl-warn">Low stock: '+st.toLocaleString()+' available</span>':'')};
     });
     const all=Number(r.totalQty||r.qty||0)||total;
-    show('Books Requested','Request '+rid+(r.requestor?' · '+r.requestor:'')+' · '+it.length+' book'+(it.length===1?'':'s'),rows,'Total: '+all.toLocaleString()+' pcs'+(short?' · '+short+' short on stock':''));
+    const sd=subjData(r);
+    const pItems=it.map(i=>({t:i.bookTitle,subject:i.split?'':i.subject,grade:i.split?'':i.grade,qty:(i.qty===null||i.qty===undefined)?null:Number(i.qty)}));
+    show('Books Requested','Request '+rid+(r.requestor?' · '+r.requestor:'')+' · '+it.length+' book'+(it.length===1?'':'s'),rows,'Total: '+all.toLocaleString()+' pcs'+(short?' · '+short+' short on stock':''),{r:r,items:pItems,total:all,subjects:[...sd.map.keys()].sort((a,b)=>a.localeCompare(b)),grades:sd.grades,mixed:it.some(i=>i.split)});
   };
   // ---- Subject / Grade popup (sorted so it is easy to scan) ----
   const gRank=g=>{const t=K(g);if(t==='nursery')return 0;let m=t.match(/^pre-?\s*kinder\s*(\d)/);if(m)return +m[1];if(t==='kinder'||t==='kindergarten')return 3;m=t.match(/^(?:grade\s*)?(\d+)$/);if(m)return 10+ +m[1];return 100};
@@ -1670,6 +1679,30 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
       rows=subs.map(x=>({t:x,m:chips([...d.map.get(x)].sort(gSort)),q:null}));
     }
     show('Subjects & Grade Levels','Request '+rid+' · '+subs.length+' subject'+(subs.length===1?'':'s')+' (A–Z) · '+d.grades.length+' grade level'+(d.grades.length===1?'':'s'),rows,d.joined?'Subjects listed A–Z; grade levels ordered Nursery → Grade 12':'Grades ordered Nursery → Grade 12');
+  };
+  // ---- Printable warehouse pick list ----
+  window.printBookList=function(){
+    const P=window.__blPrint;if(!P)return;
+    const r=P.r,fd=v=>{if(!v)return '';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'})};
+    const rows=P.items.slice().sort((a,b)=>String(a.subject||'').localeCompare(String(b.subject||''))||gSort(a.grade||'',b.grade||'')||String(a.t).localeCompare(String(b.t),undefined,{numeric:true}));
+    const body=rows.map((x,n)=>'<tr><td class="c">'+(n+1)+'</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="t">'+E(x.t)+'</td><td>'+E(x.subject||'')+'</td><td class="c">'+E(x.grade||'')+'</td><td class="c q">'+(x.qty===null?'':x.qty.toLocaleString())+'</td></tr>').join('');
+    const meta=[['Request No.',r.requestId],['Requestor',r.requestor],['School / Org.',r.school||r.organization],['Pickup date',fd(r.pickupDate)],['Printed',new Date().toLocaleString('en-PH')]].filter(m=>m[1]);
+    const note=P.mixed?'<p class="note"><b>Subjects:</b> '+E(P.subjects.join(', '))+'<br><b>Grade levels:</b> '+E(P.grades.join(', '))+'</p>':'';
+    const html='<!doctype html><html><head><meta charset="utf-8"><title>Pick List '+E(r.requestId)+'</title><style>'+
+      '@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:12px;margin:0}'+
+      'h1{font-size:18px;margin:0}.sub{font-size:12px;color:#444;margin:2px 0 10px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 18px;border:1px solid #000;padding:8px 10px;margin-bottom:10px}.meta div b{display:inline-block;min-width:90px}'+
+      'table{width:100%;border-collapse:collapse}th,td{font-size:12px;border:1px solid #000;padding:6px 7px;vertical-align:middle}th{background:#e5e5e5;font-size:11px;text-transform:uppercase}tr{page-break-inside:avoid}'+
+      'td.c{text-align:center}td.t{font-weight:700;font-size:13px}td.q{font-weight:800;font-size:14px}td.pk{width:80px}.box{display:inline-block;width:17px;height:17px;border:1.5px solid #000;line-height:15px;font-size:14px;font-weight:800;text-align:center}'+
+      '.note{border:1px solid #000;padding:6px 10px;margin:0 0 10px;font-size:11.5px;line-height:1.5}.tot{text-align:right;font-weight:800;font-size:14px;margin:8px 0 22px}'+
+      '.sig{display:flex;gap:40px;margin-top:26px}.sig div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:11px}thead{display:table-header-group}'+
+      '</style></head><body><h1>Books Across the Seas — Warehouse Pick List</h1><div class="sub">Rotary Club of Makati · sorted by subject, then grade level</div>'+
+      '<div class="meta">'+meta.map(m=>'<div><b>'+E(m[0])+':</b> '+E(m[1])+'</div>').join('')+'</div>'+note+
+      '<table><thead><tr><th style="width:30px">#</th><th style="width:46px">Picked</th><th style="width:56px">Checked</th><th>Book title</th><th style="width:120px">Subject</th><th style="width:70px">Grade</th><th style="width:60px">Qty</th></tr></thead><tbody>'+body+'</tbody></table>'+
+      '<div class="tot">'+rows.length+' title'+(rows.length===1?'':'s')+' · Total: '+Number(P.total||0).toLocaleString()+' pcs</div>'+
+      '<div class="sig"><div>Picked by</div><div>Checked by</div><div>Date</div></div></body></html>';
+    const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+    const d=f.contentWindow.document;d.open();d.write(html);d.close();
+    setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){alert('Could not open the print dialog.')}setTimeout(()=>f.remove(),60000)},300);
   };
   // Summary of all visible requests (the "Books requested" box above the table)
   window.openBookSummary=function(){
