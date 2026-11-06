@@ -1713,5 +1713,226 @@ document.addEventListener('click',function(e){const a=e.target.closest('[data-re
   document.addEventListener('keydown',e=>{if(e.key==='Escape')window.closeBookList()});
 })();
 </script>
+<!-- ===== Easy Request Picker: browse by grade, subject filter, search, request cart ===== -->
+<style>
+#bpRoot{border:1px solid var(--line);border-radius:14px;padding:14px;background:#f8fafc}
+#bpRoot .bp-h{font-weight:800;color:#173b72;font-size:16px;margin-bottom:2px}
+#bpRoot .bp-tip{font-size:12.5px;color:#64748b;margin-bottom:10px}
+#bpRoot .bp-lbl{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#425466;margin:10px 0 6px}
+#bpRoot .bp-chips{display:flex;flex-wrap:wrap;gap:6px}
+#bpRoot .bp-chip{background:#fff;color:#173b72;border:1px solid #bfdbfe;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer}
+#bpRoot .bp-chip small{opacity:.7;margin-left:4px;font-weight:600}
+#bpRoot .bp-chip.on{background:#2563eb;color:#fff;border-color:#2563eb}
+#bpRoot .bp-chip.sub.on{background:#16803c;border-color:#16803c}
+#bpRoot .bp-tool{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 8px}
+#bpRoot .bp-tool input{flex:1;min-width:200px}
+#bpRoot .bp-tool button{padding:8px 12px;font-size:12.5px}
+#bpRoot .bp-count{font-size:12.5px;color:#475569;margin:2px 0 6px}
+#bpRoot .bp-list{max-height:430px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+#bpRoot .bp-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #eef2f7}
+#bpRoot .bp-row:last-child{border-bottom:0}
+#bpRoot .bp-row.sel{background:#eff6ff}
+#bpRoot .bp-chk{width:22px;height:22px;flex:0 0 auto;accent-color:#2563eb;cursor:pointer}
+#bpRoot .bp-info{flex:1;min-width:0;cursor:pointer}
+#bpRoot .bp-info b{display:block;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+#bpRoot .bp-info small{color:#64748b;font-size:12px}
+#bpRoot .bp-low{color:#b45309;font-weight:700}
+#bpRoot .bp-qty{display:none;align-items:center;gap:4px;flex:0 0 auto}
+#bpRoot .bp-row.sel .bp-qty{display:flex}
+#bpRoot .bp-qty button{width:34px;height:34px;padding:0;font-size:18px;border-radius:8px}
+#bpRoot .bp-qty input{width:64px;text-align:center;padding:7px 4px}
+#bpRoot .bp-empty{padding:26px;text-align:center;color:#64748b}
+#bpRoot .bp-cart{position:sticky;bottom:8px;margin-top:12px;background:#fff;border:2px solid #2563eb;border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(23,59,114,.18)}
+#bpRoot .bp-cart h4{margin:0 0 6px;color:#173b72;font-size:14px}
+#bpRoot .bp-ci{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0;border-bottom:1px dashed #e2e8f0}
+#bpRoot .bp-ci span{flex:1;min-width:0;overflow-wrap:anywhere}
+#bpRoot .bp-ci b{white-space:nowrap}
+#bpRoot .bp-ci button{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:6px;font-size:12px}
+#bpRoot .bp-cl{max-height:150px;overflow-y:auto;margin-bottom:6px}
+#bpRoot .bp-tot{font-weight:800;color:#173b72}
+#bpRoot .bp-don{font-size:12px;color:#64748b;margin-top:2px}
+#bpRoot .bp-warn{color:#b91c1c;font-weight:700;font-size:12.5px}
+.req-success-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+</style>
+<script>
+(function(){
+  const S={grade:'',subject:'',q:'',cart:new Map()};
+  const K=v=>String(v??'').trim().toLowerCase();
+  const gRank=g=>{const t=K(g);if(t==='nursery')return 0;let m=t.match(/^pre-?\s*kinder\s*(\d)/);if(m)return +m[1];if(t==='kinder'||t==='kindergarten'||t==='k')return 3;m=t.match(/^(?:grade\s*)?(\d+)$/);if(m)return 10+ +m[1];return 100};
+  const gSort=(a,b)=>gRank(a)-gRank(b)||String(a).localeCompare(String(b),undefined,{numeric:true});
+  const gLabel=g=>/^\d+$/.test(String(g).trim())?'Grade '+String(g).trim():String(g);
+  const books=()=>(window.publicBooksCache||[]).filter(b=>Number(b.qty)>0);
+  const byRow=r=>books().find(b=>String(b.row)===String(r));
+  const SAVE=['qEmail','qOrg','qRequestor','qMobile','qAddress','qSchool','qPrincipal','qSchoolContact','qStudents','qLevel'];
+  const LS='bats_requestor_v1';
+
+  function mount(){
+    const old=document.getElementById('publicBookItems');if(!old)return;
+    const host=old.parentElement;
+    host.innerHTML='<div id="bpRoot"><div class="bp-h">📚 Choose the books you need</div>'+
+      '<div class="bp-tip">1) Tap your grade level  2) (optional) tap a subject  3) tick the books you want and set how many copies. Your picks stay in the box at the bottom.</div>'+
+      '<div class="bp-lbl">Grade level</div><div class="bp-chips" id="bpGrades"></div>'+
+      '<div class="bp-lbl">Subject</div><div class="bp-chips" id="bpSubjects"></div>'+
+      '<div class="bp-tool"><input id="bpSearch" type="search" placeholder="🔍 Search a book title…">'+
+      '<button type="button" class="gray" data-bp="all">☑ Select all shown</button>'+
+      '<button type="button" class="gray" data-bp="none">☐ Unselect shown</button>'+
+      '<button type="button" class="gray" data-bp="students" title="Set every picked book to the number of students">👥 Match # of students</button></div>'+
+      '<div class="bp-count" id="bpCount"></div><div class="bp-list" id="bpList"></div>'+
+      '<div class="bp-cart" id="bpCart"></div></div>';
+    const root=document.getElementById('bpRoot');
+    root.addEventListener('click',onClick);
+    root.addEventListener('change',onChange);
+    root.addEventListener('input',onInput);
+  }
+
+  function filtered(){
+    return books().filter(b=>(!S.grade||String(b.grade).trim()===S.grade)&&(!S.subject||String(b.subject).trim()===S.subject)&&(!S.q||K(b.title).includes(S.q)||K(b.subject).includes(S.q)))
+      .sort((a,b)=>String(a.subject).localeCompare(String(b.subject))||gSort(a.grade,b.grade)||String(a.title).localeCompare(String(b.title),undefined,{numeric:true}));
+  }
+  function chips(){
+    const all=books();
+    const gs=[...new Set(all.map(b=>String(b.grade).trim()).filter(Boolean))].sort(gSort);
+    const inGrade=all.filter(b=>!S.grade||String(b.grade).trim()===S.grade);
+    const ss=[...new Set(inGrade.map(b=>String(b.subject).trim()).filter(Boolean))].sort();
+    if(S.subject&&!ss.includes(S.subject))S.subject='';
+    document.getElementById('bpGrades').innerHTML='<button type="button" class="bp-chip'+(!S.grade?' on':'')+'" data-g="">All grades<small>'+all.length+'</small></button>'+
+      gs.map(g=>'<button type="button" class="bp-chip'+(S.grade===g?' on':'')+'" data-g="'+esc(g)+'">'+esc(gLabel(g))+'<small>'+all.filter(b=>String(b.grade).trim()===g).length+'</small></button>').join('');
+    document.getElementById('bpSubjects').innerHTML='<button type="button" class="bp-chip sub'+(!S.subject?' on':'')+'" data-s="">All subjects</button>'+
+      ss.map(s=>'<button type="button" class="bp-chip sub'+(S.subject===s?' on':'')+'" data-s="'+esc(s)+'">'+esc(s)+'<small>'+inGrade.filter(b=>String(b.subject).trim()===s).length+'</small></button>').join('');
+  }
+  function list(){
+    const a=filtered();
+    document.getElementById('bpCount').textContent=a.length?('Showing '+a.length+' book(s)'+(S.grade?' for '+gLabel(S.grade):'')+(S.subject?' • '+S.subject:'')+' — only books currently in stock are listed.'):'';
+    document.getElementById('bpList').innerHTML=a.map(b=>{
+      const r=String(b.row),sel=S.cart.has(r),n=Number(b.qty),q=sel?S.cart.get(r):1;
+      return '<div class="bp-row'+(sel?' sel':'')+'" data-r="'+esc(r)+'"><input type="checkbox" class="bp-chk"'+(sel?' checked':'')+'>'+
+        '<div class="bp-info"><b>'+esc(b.title)+'</b><small>'+esc(b.subject)+' · '+esc(gLabel(b.grade))+' · '+(n<=5?'<span class="bp-low">Only '+n+' left</span>':'Available: '+n.toLocaleString())+'</small></div>'+
+        '<div class="bp-qty"><button type="button" class="gray" data-m="-1">−</button><input type="number" class="bp-n" min="1" max="'+n+'" value="'+q+'"><button type="button" class="gray" data-m="1">+</button></div></div>';
+    }).join('')||'<div class="bp-empty">No books found. Try another grade, subject or search word.</div>';
+  }
+  function cart(){
+    const el=document.getElementById('bpCart');
+    const items=[...S.cart.entries()].map(([r,q])=>({b:byRow(r),q:q})).filter(x=>x.b);
+    const total=items.reduce((s,x)=>s+x.q,0);
+    if(!items.length){el.innerHTML='<h4>🛒 Your request is empty</h4><div class="bp-tip" style="margin:0">Tick the books above and they will appear here.</div>';save();return}
+    const students=Number((document.getElementById('qStudents')||{}).value||0);
+    el.innerHTML='<h4>🛒 Your request: '+items.length+' title(s) • '+total.toLocaleString()+' book(s)</h4><div class="bp-cl">'+
+      items.map(x=>'<div class="bp-ci"><span>'+esc(x.b.title)+' <small style="color:#64748b">('+esc(gLabel(x.b.grade))+')</small></span><b>× '+x.q+'</b><button type="button" data-rm="'+esc(String(x.b.row))+'">✕</button></div>').join('')+'</div>'+
+      '<div class="bp-tot">Total: '+total.toLocaleString()+' book(s)</div>'+
+      '<div class="bp-don">Estimated token donation: '+money(total*7)+' – '+money(total*10)+' (₱7–₱10 per book)</div>'+
+      (students&&total>students*items.length?'<div class="bp-warn">Heads up: this is more than 1 book per student per title.</div>':'');
+    save();
+  }
+  function all(){chips();list();cart()}
+  function setQty(r,q){const b=byRow(r);if(!b)return 0;q=Math.max(1,Math.min(Number(b.qty),Math.floor(Number(q))||1));S.cart.set(String(r),q);return q}
+
+  function onClick(e){
+    const t=e.target;
+    const g=t.closest('[data-g]');if(g){S.grade=g.getAttribute('data-g');S.subject='';all();return}
+    const s=t.closest('[data-s]');if(s){S.subject=s.getAttribute('data-s');chips();list();return}
+    const rm=t.closest('[data-rm]');if(rm){S.cart.delete(rm.getAttribute('data-rm'));list();cart();return}
+    const bp=t.closest('[data-bp]');
+    if(bp){const k=bp.getAttribute('data-bp');
+      if(k==='all'){filtered().forEach(b=>{if(!S.cart.has(String(b.row)))setQty(b.row,1)})}
+      else if(k==='none'){filtered().forEach(b=>S.cart.delete(String(b.row)))}
+      else if(k==='students'){const n=Number(document.getElementById('qStudents').value||0);if(!n){alert('Please enter the Number of Students above first.');return}
+        if(!S.cart.size){alert('Pick some books first, then use this button.');return}
+        [...S.cart.keys()].forEach(r=>setQty(r,n))}
+      list();cart();return}
+    const m=t.closest('[data-m]');
+    if(m){const row=m.closest('.bp-row'),r=row.getAttribute('data-r'),inp=row.querySelector('.bp-n');
+      const q=setQty(r,Number(inp.value||1)+Number(m.getAttribute('data-m')));inp.value=q;cart();return}
+    const info=t.closest('.bp-info');
+    if(info){const chk=info.closest('.bp-row').querySelector('.bp-chk');chk.checked=!chk.checked;chk.dispatchEvent(new Event('change',{bubbles:true}))}
+  }
+  function onChange(e){
+    const chk=e.target.closest('.bp-chk');if(!chk)return;
+    const row=chk.closest('.bp-row'),r=row.getAttribute('data-r');
+    if(chk.checked){setQty(r,Number(row.querySelector('.bp-n').value||1));row.classList.add('sel')}
+    else{S.cart.delete(r);row.classList.remove('sel')}
+    cart();
+  }
+  function onInput(e){
+    if(e.target.id==='bpSearch'){S.q=K(e.target.value);list();return}
+    if(e.target.classList.contains('bp-n')){
+      const row=e.target.closest('.bp-row'),r=row.getAttribute('data-r'),b=byRow(r);if(!b||e.target.value==='')return;
+      const q=setQty(r,e.target.value);if(String(q)!==e.target.value)e.target.value=q;cart();
+    }
+  }
+
+  // ---- remembered requestor details (returning requestors) ----
+  function save(){try{const d={};SAVE.forEach(id=>{const el=document.getElementById(id);if(el)d[id]=el.value});localStorage.setItem(LS,JSON.stringify(d))}catch(e){}}
+  function restore(){try{const d=JSON.parse(localStorage.getItem(LS)||'{}');SAVE.forEach(id=>{const el=document.getElementById(id);if(el&&!el.value&&d[id])el.value=d[id]})}catch(e){}}
+  SAVE.forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',save);el.addEventListener('change',save)}});
+  const stu=document.getElementById('qStudents');if(stu)stu.addEventListener('input',cart);
+
+  // ---- overrides of the old multi-dropdown form ----
+  window.initPublicBookItems=function(){S.grade='';S.subject='';S.q='';S.cart=new Map();mount();restore();
+    const lv=document.getElementById('qLevel');
+    all()};
+  window.openPublicRequest=async function(){
+    document.getElementById('portalHome').style.display='none';
+    document.getElementById('adminPortal').style.display='none';
+    document.getElementById('publicRequestTab').classList.add('active');
+    document.getElementById('requestSuccess').classList.remove('show');
+    try{const d=await apiGet('publicBooks');window.publicBooksCache=d.books||[]}
+    catch(e){window.publicBooksCache=[];alert('Could not load the available books list.\n\n'+e.message)}
+    window.initPublicBookItems();
+  };
+  window.clearRequestForm=function(){
+    SAVE.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+    document.getElementById('qPurpose').value='';
+    try{localStorage.removeItem(LS)}catch(e){}
+    document.getElementById('requestSuccess').classList.remove('show');
+    window.initPublicBookItems();
+  };
+  function cartItems(){return [...S.cart.entries()].map(([r,q])=>({b:byRow(r),q:q})).filter(x=>x.b)}
+
+  window.submitBookRequest=async function(){
+    const v=id=>document.getElementById(id).value.trim();
+    const base={requestDate:new Date().toISOString().slice(0,10),email:v('qEmail'),organization:v('qOrg'),requestor:v('qRequestor'),mobile:v('qMobile'),address:v('qAddress'),school:v('qSchool'),principal:v('qPrincipal'),schoolContact:v('qSchoolContact'),students:Number(v('qStudents')||0),level:document.getElementById('qLevel').value,purpose:v('qPurpose'),status:'Pending Approval'};
+    const need=[['qEmail','Email'],['qOrg','Organization / Rotary Club'],['qRequestor','Name and Title of Requestor'],['qMobile','Mobile Number'],['qAddress','Address'],['qSchool','Beneficiary School / Library'],['qStudents','Number of Students'],['qLevel','Education Level']];
+    for(const [id,l] of need){if(!document.getElementById(id).value.trim()){alert('Please fill in: '+l);document.getElementById(id).focus();return}}
+    if(!/^\S+@\S+\.\S+$/.test(base.email)){alert('Please enter a valid email address.');document.getElementById('qEmail').focus();return}
+    if(!/^(\+?63|0)9\d{9}$/.test(base.mobile.replace(/[\s-]/g,''))){alert('Please enter a valid mobile number, e.g. 09171234567.');document.getElementById('qMobile').focus();return}
+    const items=cartItems();
+    if(!items.length){alert('Please tick at least one book from the list.');return}
+    for(const x of items){if(x.q>Number(x.b.qty)){alert('Only '+x.b.qty+' of "'+x.b.title+'" are in stock.');return}}
+    const records=items.map(x=>({...base,subject:x.b.subject,grade:x.b.grade,bookRow:x.b.row,bookTitle:x.b.title,qty:x.q}));
+    const total=records.reduce((s,r)=>s+r.qty,0);
+    if(!confirm('Please review your request:\n\n'+records.map((r,i)=>(i+1)+'. '+r.bookTitle+' ('+gLabel(r.grade)+') × '+r.qty).join('\n')+'\n\nTotal: '+total+' book(s) for '+base.school+'.\n\nSubmit this request?'))return;
+    try{
+      const d=await apiPost({action:'bookRequest',records:records},false);
+      window.__lastRequest={id:d.requestId||'',base:base,records:records};
+      save();
+      const box=document.getElementById('requestSuccess');
+      box.innerHTML='<strong>✅ Request submitted successfully.</strong><br>Your Request No.: <b>'+esc(d.requestId||'(see confirmation)')+'</b> — please keep this number.<br>'+records.length+' title(s), <b>'+total+'</b> book(s) in total. It is now pending approval by the BATS Chairman; you will be contacted using your email / mobile.'+
+        '<div class="req-success-actions"><button type="button" class="gray" onclick="printRequest()">🖨 Print / save my request</button><button type="button" class="green" onclick="initPublicBookItems();document.getElementById(\'requestSuccess\').classList.remove(\'show\')">＋ Make another request</button></div>';
+      box.classList.add('show');box.scrollIntoView({behavior:'smooth',block:'center'});
+      S.cart=new Map();list();cart();
+    }catch(e){alert('The request form could not be submitted.\n\n'+e.message)}
+  };
+
+  window.printRequest=function(){
+    const L=window.__lastRequest,live=cartItems();
+    const base=L?L.base:null;
+    const val=id=>base?base[id]:'';
+    const rows=(L?L.records.map(r=>({t:r.bookTitle,g:r.grade,s:r.subject,q:r.qty})):live.map(x=>({t:x.b.title,g:x.b.grade,s:x.b.subject,q:x.q})));
+    const field=(l,id,key)=>'<p><strong>'+l+':</strong> '+esc(base?base[key]:document.getElementById(id).value)+'</p>';
+    let html='<h1>BOOKS ACROSS THE SEAS — BOOK REQUEST</h1><p>Date: '+new Date().toLocaleDateString('en-PH')+(L&&L.id?' &nbsp; • &nbsp; Request No.: <b>'+esc(L.id)+'</b>':'')+'</p>'+
+      field('Email','qEmail','email')+field('Organization / Rotary Club','qOrg','organization')+field('Requestor','qRequestor','requestor')+field('Mobile','qMobile','mobile')+field('Address','qAddress','address')+
+      field('Beneficiary School / Library','qSchool','school')+field('Principal / Head','qPrincipal','principal')+field('School Contact','qSchoolContact','schoolContact')+field('Number of Students','qStudents','students')+field('Education Level','qLevel','level')+field('Purpose / Remarks','qPurpose','purpose')+
+      '<h3>Books Requested</h3><table><tr><th>#</th><th>Title</th><th>Subject</th><th>Grade</th><th>Qty</th></tr>'+rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.t)+'</td><td>'+esc(r.s)+'</td><td>'+esc(gLabel(r.g))+'</td><td>'+r.q+'</td></tr>').join('')+
+      '<tr><td colspan="4" style="text-align:right"><b>Total</b></td><td><b>'+rows.reduce((s,r)=>s+r.q,0)+'</b></td></tr></table>';
+    const w=window.open('','_blank','width=800,height=900');if(!w){alert('Please allow pop-ups to print.');return}
+    w.document.write('<html><head><title>Book Request</title><style>body{font-family:Arial;padding:36px;line-height:1.5;font-size:13px}h1{color:#173b72;font-size:20px}p{border-bottom:1px solid #ddd;padding:5px 0;margin:0}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #888;padding:6px;text-align:left}th{background:#eee}</style></head><body>'+html+'</body></html>');
+    w.document.close();setTimeout(()=>w.print(),400);
+  };
+
+  // Also make the page work if the picker is already open
+  if(document.getElementById('publicBookItems')){mount();all();}
+})();
+</script>
+
 </body>
 </html>
